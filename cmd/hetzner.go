@@ -20,7 +20,7 @@ manage instances, and configure deployments using the official Hetzner Cloud SDK
 Authentication:
   Set HCLOUD_TOKEN environment variable or configure in cool-kit config.
   
-  Don't have a Hetzner account? Sign up with our referral link to support Coolify:
+  Don't have a Hetzner account? Sign up with their referral link to support the Coolify project:
   https://coolify.io/hetzner (or https://console.hetzner.com/refer?pk_campaign=referral-invite&pk_medium=referral-program&pk_source=reflink&pk_content=VBVO47VycYLt)`,
 }
 

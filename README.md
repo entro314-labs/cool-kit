@@ -549,24 +549,12 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## ❤️ Support Coolify
 
-Coolify is an open-source project. If you use **Hetzner Cloud** for your deployments, please consider using our referral link. It helps support the project at no extra cost to you!
+Cool-Kit is an independent, community-driven toolkit and is **not affiliated** with the official Coolify project. We love Coolify and want to see it thrive!
+
+If you use **Hetzner Cloud** for your deployments, please consider using **their** referral link. It helps support the official Coolify project at no extra cost to you!
 
 - **Sign up for Hetzner**: [https://coolify.io/hetzner](https://coolify.io/hetzner)
 - **Direct Link**: [Hetzner Console](https://console.hetzner.com/refer?pk_campaign=referral-invite&pk_medium=referral-program&pk_source=reflink&pk_content=VBVO47VycYLt)
-
----
-
-## 🎉 Acknowledgments
-
-Cool-Kit is the result of migrating **3,397 lines of bash scripts** to **~3,800 lines of type-safe Go code**, providing:
-
-- ✅ Cross-platform compatibility
-- ✅ Better error handling
-- ✅ Interactive user experience
-- ✅ Complete Azure integration
-- ✅ Production-ready deployment workflows
-
-**Migration completed**: 2025-12-27 (100% complete)
 
 ---
 
