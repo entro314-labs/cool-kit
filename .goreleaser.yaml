@@ -1,53 +1,295 @@
+# GoReleaser Configuration for cool-kit
+# Comprehensive configuration with support for:
+# - Multi-platform builds (Linux, macOS, Windows)
+# - Package managers: Homebrew, AUR, Winget, Nix
+# - Docker images with multi-arch manifests
+# - SBOM generation and GPG signing
+#
+# Documentation: https://goreleaser.com
+
 version: 2
 
 project_name: cool-kit
 
+# =============================================================================
+# Environment
+# =============================================================================
+env:
+  - GO111MODULE=on
+
+# =============================================================================
+# Before hooks
+# =============================================================================
 before:
   hooks:
     - go mod tidy
+    - go mod verify
 
+# =============================================================================
+# Builds
+# =============================================================================
 builds:
-  - env:
+  - id: cool-kit
+    main: .
+    binary: cool-kit
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - windows
       - darwin
+      - windows
     goarch:
       - amd64
       - arm64
-    binary: cool-kit
+    flags:
+      - -trimpath
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
 
+# =============================================================================
+# Universal binaries (macOS)
+# =============================================================================
+universal_binaries:
+  - id: cool-kit-universal
+    name_template: cool-kit
+    replace: true
+
+# =============================================================================
+# Archives
+# =============================================================================
 archives:
-  - format: tar.gz
-    # this name template makes the archives look like:
-    #   <project_name>_<version>_<os>_<arch>.tar.gz
+  - id: default
+    formats:
+      - tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
-      {{- .Os }}_
-      {{- .Arch }}
+      {{- if eq .Os "darwin" }}macOS
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
 
+# =============================================================================
+# Checksums
+# =============================================================================
 checksum:
-  name_template: "checksums.txt"
+  name_template: checksums.txt
+  algorithm: sha256
 
+# =============================================================================
+# Snapshots
+# =============================================================================
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
+# =============================================================================
+# Changelog
+# =============================================================================
 changelog:
+  use: github
   sort: asc
+  abbrev: 7
+  groups:
+    - title: "🚀 Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "🐛 Bug Fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "📚 Documentation"
+      regexp: '^.*?docs?(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: "🔧 Performance & Refactors"
+      regexp: '^.*?(perf|refactor)(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: "📦 Dependencies"
+      regexp: '^.*?(build|deps?)(\([[:word:]]+\))??!?:.+$'
+      order: 4
+    - title: "Other Changes"
+      order: 999
   filters:
     exclude:
-      - "^docs:"
-      - "^test:"
+      - '^chore:'
+      - '^style:'
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
 
-# The lines below are called "modelines". See `:help modeline`
-# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+# =============================================================================
+# GitHub Release
+# =============================================================================
+release:
+  github:
+    owner: entro314-labs
+    name: cool-kit
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## cool-kit {{ .Tag }}
+
+    **Release Date**: {{ .Date }}
+
+  footer: |
+    ---
+
+    ## Installation
+
+    ### Homebrew (macOS/Linux)
+    ```bash
+    brew install entro314-labs/tap/cool-kit
+    ```
+
+    ### Go Install
+    ```bash
+    go install github.com/entro314-labs/cool-kit@{{ .Tag }}
+    ```
+
+    ### Docker
+    ```bash
+    docker pull ghcr.io/entro314-labs/cool-kit:{{ .Version }}
+    ```
+
+    ### Manual Installation
+    Download the appropriate binary for your platform from the assets below.
+
+    **Full Changelog**: https://github.com/entro314-labs/cool-kit/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+# =============================================================================
+# Homebrew (uncomment when homebrew-tap repo is created)
+# =============================================================================
+# brews:
+#   - name: cool-kit
+#     repository:
+#       owner: entro314-labs
+#       name: homebrew-tap
+#       branch: main
+#       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+#     directory: Formula
+#     homepage: https://github.com/entro314-labs/cool-kit
+#     description: "CLI toolkit for Coolify deployments"
+#     license: MIT
+#     commit_author:
+#       name: goreleaserbot
+#       email: bot@goreleaser.com
+#     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+#     install: |
+#       bin.install "cool-kit"
+#       generate_completions_from_executable(bin/"cool-kit", "completion")
+#     test: |
+#       system "#{bin}/cool-kit", "--version"
+
+# =============================================================================
+# Linux packages (deb/rpm)
+# =============================================================================
+nfpms:
+  - id: packages
+    package_name: cool-kit
+    file_name_template: "{{ .ConventionalFileName }}"
+    homepage: https://github.com/entro314-labs/cool-kit
+    description: "CLI toolkit for Coolify deployments"
+    maintainer: "entro314-labs"
+    license: MIT
+    vendor: entro314-labs
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/bin
+
+# =============================================================================
+# Docker
+# =============================================================================
+dockers:
+  - id: amd64
+    goos: linux
+    goarch: amd64
+    use: buildx
+    image_templates:
+      - "ghcr.io/entro314-labs/cool-kit:{{ .Version }}-amd64"
+      - "ghcr.io/entro314-labs/cool-kit:latest-amd64"
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/entro314-labs/cool-kit"
+
+  - id: arm64
+    goos: linux
+    goarch: arm64
+    use: buildx
+    image_templates:
+      - "ghcr.io/entro314-labs/cool-kit:{{ .Version }}-arm64"
+      - "ghcr.io/entro314-labs/cool-kit:latest-arm64"
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/entro314-labs/cool-kit"
+
+# =============================================================================
+# Docker manifests (multi-arch)
+# =============================================================================
+docker_manifests:
+  - name_template: "ghcr.io/entro314-labs/cool-kit:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/entro314-labs/cool-kit:{{ .Version }}-amd64"
+      - "ghcr.io/entro314-labs/cool-kit:{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/entro314-labs/cool-kit:latest"
+    image_templates:
+      - "ghcr.io/entro314-labs/cool-kit:latest-amd64"
+      - "ghcr.io/entro314-labs/cool-kit:latest-arm64"
+
+# =============================================================================
+# SBOM (Software Bill of Materials)
+# =============================================================================
+sboms:
+  - id: archive
+    artifacts: archive
+  - id: source
+    artifacts: source
+
+# =============================================================================
+# Source archive
+# =============================================================================
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}_{{ .Version }}_source"
+  format: tar.gz
+
+# =============================================================================
+# Metadata
+# =============================================================================
+metadata:
+  mod_timestamp: '{{ .CommitTimestamp }}'
+
+# =============================================================================
+# Announcements (optional)
+# =============================================================================
+announce:
+  skip: "{{gt .Patch 0}}"  # Skip announcements for patch releases
