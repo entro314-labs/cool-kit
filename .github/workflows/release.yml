@@ -49,6 +49,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
+        id: buildx
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
@@ -64,10 +65,9 @@ jobs:
         run: |
           docker buildx ls
           docker run --privileged --rm tonistiigi/binfmt --install all
-          # Get the current builder name robustly
-          BUILDER_NAME=$(docker buildx inspect --format '{{.Name}}')
-          echo "Current builder: $BUILDER_NAME"
-          echo "BUILDER_NAME=$BUILDER_NAME" >> $GITHUB_ENV
+          # Get the current builder name directly from action outputs
+          echo "Current builder: ${{ steps.buildx.outputs.name }}"
+          echo "BUILDER_NAME=${{ steps.buildx.outputs.name }}" >> $GITHUB_ENV
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
