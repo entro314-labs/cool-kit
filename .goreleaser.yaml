@@ -244,6 +244,7 @@ dockers_v2:
     
     flags:
       - "--pull"
+      - "--builder=goreleaser"
       
     labels:
       "org.opencontainers.image.created": "{{.Date}}"
