@@ -1,0 +1,18 @@
+# Dockerfile for GoReleaser
+# Uses the binary built by GoReleaser on the host
+FROM alpine:3.23
+
+RUN apk add --no-cache ca-certificates git tzdata && rm -rf /var/cache/apk/*
+
+RUN addgroup -g 1000 app \
+    && adduser -u 1000 -G app -s /bin/sh -D app
+
+# GoReleaser copies the binary to the root of the context
+COPY cool-kit /usr/local/bin/cool-kit
+RUN chmod +x /usr/local/bin/cool-kit
+
+USER app
+WORKDIR /workspace
+
+ENTRYPOINT ["/usr/local/bin/cool-kit"]
+CMD ["--help"]
