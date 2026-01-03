@@ -48,18 +48,26 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Install binfmt for cross-platform builds
-        run: docker run --privileged --rm tonistiigi/binfmt --install all
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
+          # Name the builder 'goreleaser' so GoReleaser can use it
+          buildkitd-config-inline: |
+            [worker.oci]
+              max-parallelism = 4
+          # Install QEMU platforms
+          platforms: linux/amd64,linux/arm64
 
-      - name: Create buildx builder for GoReleaser
+      # Verify buildx is working and list builders
+      - name: Verify buildx setup
         run: |
-          docker buildx create --name goreleaser --driver docker-container --use
-          docker buildx inspect --bootstrap
+          docker buildx ls
+          docker run --privileged --rm tonistiigi/binfmt --install all
+          # Get the current builder name
+          BUILDER_NAME=$(docker buildx ls | grep '\*' | awk '{print $1}' | tr -d '*')
+          echo "Current builder: $BUILDER_NAME"
+          echo "BUILDER_NAME=$BUILDER_NAME" >> $GITHUB_ENV
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3

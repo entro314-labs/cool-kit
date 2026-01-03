@@ -242,9 +242,12 @@ dockers_v2:
       - linux/amd64
       - linux/arm64
     
+    # Skip Docker builds in snapshot mode - --load is incompatible with cross-arch builds
+    # Production releases (with tags) will still build and push Docker images
+    disable: "{{ .IsSnapshot }}"
+    
     flags:
       - "--pull"
-      - "--builder=goreleaser"
       
     labels:
       "org.opencontainers.image.created": "{{.Date}}"
