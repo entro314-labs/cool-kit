@@ -1,0 +1,55 @@
+# Binaries
+# =============================================================================
+cool-kit
+cool-kit-dev
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build Artifacts
+# =============================================================================
+dist/
+build/
+vendor/
+
+# Test & Coverage
+# =============================================================================
+*.out
+*.test
+*.prof
+coverage.html
+coverage.txt
+default.pgo
+
+# IDEs & Editors
+# =============================================================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+.target/
+*.swp
+*.swo
+*~
+
+# OS Files
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Local Configuration
+# =============================================================================
+.env
+.env.*
+!.env.example
+
+.agent
