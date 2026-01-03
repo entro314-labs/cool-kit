@@ -37,7 +37,6 @@ linters:
     # Bugs
     - staticcheck
     - ineffassign
-
     
     # Complexity
     - gocyclo
@@ -51,7 +50,7 @@ linters:
   disable:
     - depguard  # We don't need import allowlists
 
-linters-settings:
+  # v2: Settings are now per-linter
   errcheck:
     check-type-assertions: true
     check-blank: true
@@ -66,7 +65,7 @@ linters-settings:
     min-complexity: 30
 
   gocritic:
-    enabled-tags:
+    tags:
       - diagnostic
       - style
       - performance
@@ -104,21 +103,23 @@ linters-settings:
       - name: empty-block
       - name: superfluous-else
 
+  # v2: Exclusions are here
+  exclusions:
+    rules:
+      # Exclude some linters from running on tests files
+      - path: "_test\\.go"
+        linters:
+          - gocyclo
+          - errcheck
+          - gosec
+          - gocognit
+
+      # Exclude known issues in generated files
+      - path: ".*\\.gen\\.go"
+        linters:
+          - all
+
 issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - gosec
-        - gocognit
-
-    # Exclude known issues in generated files
-    - path: ".*\\.gen\\.go"
-      linters:
-        - all
-
   max-issues-per-linter: 50
   max-same-issues: 10
   new: false
