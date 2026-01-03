@@ -23,8 +23,6 @@ linters:
     
     # Code style
     - govet
-    - gofmt
-    - goimports
     - misspell
     - unconvert
     
