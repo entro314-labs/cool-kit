@@ -8,7 +8,7 @@
 # Build arguments
 # =============================================================================
 ARG GO_VERSION=1.25
-ARG UBUNTU_VERSION=3.23
+ARG UBUNTU_VERSION=24.04
 ARG BUILD_VERSION=dev
 ARG BUILD_DATE=unknown
 ARG GIT_COMMIT=unknown
