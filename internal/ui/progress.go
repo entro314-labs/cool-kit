@@ -292,7 +292,7 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// View renders the progress UI
+// View renders the progress UI with horizontal layout
 func (m ProgressModel) View() string {
 	if m.done {
 		return m.renderComplete()
@@ -300,14 +300,24 @@ func (m ProgressModel) View() string {
 
 	var b strings.Builder
 
-	// Header
-	header := progressTitleStyle.Width(m.width).Render(
+	// Calculate widths for horizontal layout
+	totalWidth := m.width
+	if totalWidth < 80 {
+		totalWidth = 80
+	}
+	if totalWidth > 120 {
+		totalWidth = 120
+	}
+
+	// Header - centered
+	header := progressTitleStyle.Render(
 		fmt.Sprintf("🚀 Deploying Coolify to %s", strings.ToUpper(m.provider)),
 	)
-	b.WriteString(header)
+	headerLine := lipgloss.NewStyle().Width(totalWidth).Align(lipgloss.Center).Render(header)
+	b.WriteString(headerLine)
 	b.WriteString("\n\n")
 
-	// Overall progress
+	// Overall progress bar - spans full width
 	completedSteps := 0
 	for _, step := range m.steps {
 		if step.Status == StepComplete {
@@ -317,143 +327,185 @@ func (m ProgressModel) View() string {
 	overallProgress := float64(completedSteps) / float64(len(m.steps))
 	elapsed := time.Since(m.startTime).Round(time.Second)
 
-	progressLine := fmt.Sprintf("Progress: %d/%d steps • Elapsed: %s", completedSteps, len(m.steps), elapsed)
-	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Render(progressLine))
+	progressLine := fmt.Sprintf("Progress: %d/%d steps  •  Elapsed: %s", completedSteps, len(m.steps), elapsed)
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Width(totalWidth).Align(lipgloss.Center).Render(progressLine))
 	b.WriteString("\n")
-	b.WriteString(m.progress.ViewAs(overallProgress))
+
+	// Center the progress bar
+	m.progress.Width = totalWidth - 10
+	progressBar := lipgloss.NewStyle().Width(totalWidth).Align(lipgloss.Center).Render(m.progress.ViewAs(overallProgress))
+	b.WriteString(progressBar)
 	b.WriteString("\n\n")
 
-	// Steps list
+	// Calculate column widths for side-by-side panels
+	colGap := 2
+	leftWidth := (totalWidth - colGap) / 2
+	rightWidth := totalWidth - leftWidth - colGap
+
+	// LEFT PANEL: Steps
 	var stepsContent strings.Builder
-	for i, step := range m.steps {
+	stepsContent.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#9D76FF")).Render("📋 Deployment Steps"))
+	stepsContent.WriteString("\n\n")
+
+	for _, step := range m.steps {
 		icon, style := m.getStepIconAndStyle(step.Status)
 
-		// Step name with icon
 		if step.Status == StepRunning {
-			// Show spinner for running step
 			stepLine := fmt.Sprintf("%s %s %s", m.spinner.View(), icon, step.Name)
 			stepsContent.WriteString(style.Render(stepLine))
-
-			// Show elapsed time for running step
 			if !step.StartTime.IsZero() {
 				stepElapsed := time.Since(step.StartTime).Round(time.Second)
 				stepsContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#666")).Render(
-					fmt.Sprintf(" (%s)", stepElapsed),
+					fmt.Sprintf(" %s", stepElapsed),
 				))
-			}
-
-			// Show progress bar for running step
-			if step.Progress > 0 && step.Progress < 1 {
-				stepsContent.WriteString("\n    ")
-				miniProgress := progress.New(progress.WithDefaultGradient(), progress.WithWidth(30), progress.WithoutPercentage())
-				stepsContent.WriteString(miniProgress.ViewAs(step.Progress))
 			}
 		} else {
 			stepLine := fmt.Sprintf("  %s %s", icon, step.Name)
 			stepsContent.WriteString(style.Render(stepLine))
-
-			// Show duration for completed steps
 			if step.Status == StepComplete && !step.EndTime.IsZero() {
 				duration := step.EndTime.Sub(step.StartTime).Round(time.Millisecond * 100)
 				stepsContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#666")).Render(
-					fmt.Sprintf(" (%s)", duration),
+					fmt.Sprintf(" %s", duration),
 				))
 			}
 		}
-
-		if i < len(m.steps)-1 {
-			stepsContent.WriteString("\n")
-		}
+		stepsContent.WriteString("\n")
 	}
 
-	b.WriteString(stepBoxStyle.Width(m.width - 4).Render(stepsContent.String()))
-	b.WriteString("\n\n")
+	leftPanel := stepBoxStyle.Width(leftWidth - 2).Render(stepsContent.String())
 
-	// Log viewport
+	// RIGHT PANEL: Logs
 	var logsContent strings.Builder
-	logsContent.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#888")).Render("📋 Activity Log"))
+	logsContent.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#888")).Render("📜 Activity Log"))
 	logsContent.WriteString("\n\n")
 
-	// Build log content
-	for _, log := range m.logs {
-		logsContent.WriteString(m.formatLog(log))
+	// Show last N logs that fit
+	maxLogs := 10
+	startIdx := 0
+	if len(m.logs) > maxLogs {
+		startIdx = len(m.logs) - maxLogs
+	}
+	for i := startIdx; i < len(m.logs); i++ {
+		logsContent.WriteString(m.formatLog(m.logs[i]))
 		logsContent.WriteString("\n")
 	}
 
-	m.logViewport.SetContent(logsContent.String())
-	m.logViewport.GotoBottom()
+	rightPanel := logBoxStyle.Width(rightWidth - 2).Height(len(m.steps) + 4).Render(logsContent.String())
 
-	b.WriteString(logBoxStyle.Width(m.width - 4).Height(8).Render(m.logViewport.View()))
-	b.WriteString("\n")
+	// Join panels horizontally
+	gap := strings.Repeat(" ", colGap)
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, gap, rightPanel)
+	b.WriteString(panels)
+	b.WriteString("\n\n")
 
-	// Footer
-	b.WriteString(progressFooterStyle.Render("↑/↓ scroll logs • Ctrl+C cancel"))
+	// Footer - centered
+	footer := progressFooterStyle.Render("Ctrl+C cancel")
+	footerLine := lipgloss.NewStyle().Width(totalWidth).Align(lipgloss.Center).Render(footer)
+	b.WriteString(footerLine)
 
 	return b.String()
 }
 
-// renderComplete renders the completion screen
+// renderComplete renders the completion screen with horizontal layout
 func (m ProgressModel) renderComplete() string {
 	var b strings.Builder
 	totalDuration := time.Since(m.startTime).Round(time.Second)
 
+	// Calculate widths
+	totalWidth := m.width
+	if totalWidth < 80 {
+		totalWidth = 80
+	}
+	if totalWidth > 120 {
+		totalWidth = 120
+	}
+
 	if m.err != nil {
-		// Error screen
-		b.WriteString(errorBannerStyle.Width(m.width - 8).Render("❌  DEPLOYMENT FAILED"))
+		// Error screen - centered banner
+		banner := errorBannerStyle.Render("❌  DEPLOYMENT FAILED")
+		b.WriteString(lipgloss.NewStyle().Width(totalWidth).Align(lipgloss.Center).Render(banner))
 		b.WriteString("\n\n")
 
-		// Use structured error formatting
-		b.WriteString(FormatErrorBox("Deployment Error", m.err, m.width))
+		// Error details
+		b.WriteString(FormatErrorBox("Deployment Error", m.err, totalWidth))
 		b.WriteString("\n\n")
 	} else {
-		// Success screen
-		b.WriteString(successBannerStyle.Width(m.width - 8).Render("🎉  DEPLOYMENT SUCCESSFUL!"))
-		b.WriteString("\n")
+		// Success screen - centered banner
+		banner := successBannerStyle.Render("🎉  DEPLOYMENT SUCCESSFUL!")
+		b.WriteString(lipgloss.NewStyle().Width(totalWidth).Align(lipgloss.Center).Render(banner))
+		b.WriteString("\n\n")
 
-		// Dashboard URL (extract from last log)
+		// Dashboard URL - centered
 		dashboardURL := m.extractDashboardURL()
 		if dashboardURL != "" {
 			urlContent := fmt.Sprintf("🌐 Dashboard: %s", dashboardURL)
-			b.WriteString(urlBoxStyle.Width(m.width - 4).Render(urlContent))
-			b.WriteString("\n")
+			urlBox := urlBoxStyle.Render(urlContent)
+			b.WriteString(lipgloss.NewStyle().Width(totalWidth).Align(lipgloss.Center).Render(urlBox))
+			b.WriteString("\n\n")
 		}
-		b.WriteString("\n")
 	}
 
-	// Summary box
-	var summaryContent strings.Builder
-	summaryContent.WriteString(lipgloss.NewStyle().Bold(true).MarginBottom(1).Render("📊 Deployment Summary"))
-	summaryContent.WriteString("\n\n")
+	// Horizontal layout for summary and next steps
+	colGap := 4
+	colWidth := (totalWidth - colGap) / 2
 
+	// LEFT: Summary box
+	var summaryContent strings.Builder
+	summaryContent.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#9D76FF")).Render("📊 Summary"))
+	summaryContent.WriteString("\n\n")
 	summaryContent.WriteString(summaryLabelStyle.Render("Provider:"))
 	summaryContent.WriteString(summaryValueStyle.Render(strings.ToUpper(m.provider)))
 	summaryContent.WriteString("\n")
-
 	summaryContent.WriteString(summaryLabelStyle.Render("Duration:"))
 	summaryContent.WriteString(summaryValueStyle.Render(totalDuration.String()))
 	summaryContent.WriteString("\n")
-
 	summaryContent.WriteString(summaryLabelStyle.Render("Steps:"))
 	summaryContent.WriteString(summaryValueStyle.Render(fmt.Sprintf("%d/%d completed", m.countCompleted(), len(m.steps))))
-	summaryContent.WriteString("\n")
 
-	summaryBox := lipgloss.NewStyle().
+	leftPanel := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#444")).
 		Padding(1, 2).
-		Width(m.width - 4).
+		Width(colWidth).
 		Render(summaryContent.String())
 
-	b.WriteString(summaryBox)
-	b.WriteString("\n\n")
-
-	// Next steps (only on success)
+	// RIGHT: Next steps (only on success) or empty
+	var rightPanel string
 	if m.err == nil {
-		nextSteps := lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Render("Next steps:\n")
-		nextSteps += lipgloss.NewStyle().Foreground(lipgloss.Color("#14F195")).Render("  → Open the dashboard and complete initial setup\n")
-		nextSteps += lipgloss.NewStyle().Foreground(lipgloss.Color("#14F195")).Render("  → Configure SSL with a custom domain")
-		b.WriteString(nextSteps)
+		var nextContent strings.Builder
+		nextContent.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#14F195")).Render("🚀 Next Steps"))
+		nextContent.WriteString("\n\n")
+		nextContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Render("→ Open the dashboard\n"))
+		nextContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Render("→ Complete initial setup\n"))
+		nextContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Render("→ Configure SSL/domain"))
+
+		rightPanel = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#14F195")).
+			Padding(1, 2).
+			Width(colWidth).
+			Render(nextContent.String())
+	} else {
+		// Troubleshooting tips on error
+		var troubleContent strings.Builder
+		troubleContent.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF5F87")).Render("🔧 Troubleshooting"))
+		troubleContent.WriteString("\n\n")
+		troubleContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Render("→ Check logs above for details\n"))
+		troubleContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Render("→ Verify credentials are valid\n"))
+		troubleContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#888")).Render("→ Run with --verbose flag"))
+
+		rightPanel = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#FF5F87")).
+			Padding(1, 2).
+			Width(colWidth).
+			Render(troubleContent.String())
 	}
+
+	// Join panels
+	gap := strings.Repeat(" ", colGap)
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, gap, rightPanel)
+	b.WriteString(lipgloss.NewStyle().Width(totalWidth).Align(lipgloss.Center).Render(panels))
 
 	return b.String()
 }

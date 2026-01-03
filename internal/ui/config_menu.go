@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/entro314-labs/cool-kit/internal/config"
 )
 
@@ -18,7 +19,7 @@ const (
 type ConfigModel struct {
 	state   ConfigState
 	cfg     *config.Config
-	keys    []string // Flattened keys for selection
+	keys    []string
 	values  map[string]interface{}
 	cursor  int
 	width   int
@@ -27,16 +28,52 @@ type ConfigModel struct {
 	editVal string
 }
 
+// Styles for config menu
+var (
+	configTitleStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#00D4FF")).
+				Bold(true)
+
+	configBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#7D56F4")).
+			Padding(1, 2)
+
+	configKeyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9D76FF")).
+			Width(22)
+
+	configValueStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#CCCCCC"))
+
+	configSelectedKeyStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#14F195")).
+				Bold(true).
+				Width(22)
+
+	configSelectedValueStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#14F195")).
+					Bold(true)
+
+	configHelpBoxStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#444")).
+				Padding(1, 2).
+				Foreground(lipgloss.Color("#888"))
+
+	configFooterStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#555"))
+
+	configFooterKeyStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#7D56F4")).
+				Bold(true)
+)
+
 func NewConfigModel() (ConfigModel, error) {
-	// Initialize config if needed
 	if err := config.Initialize(); err != nil {
 		return ConfigModel{}, err
 	}
 	cfg := config.Get()
-
-	// Flatten config for display (simplified for demo)
-	// In a real app, you might want to recurse or list specific manageable keys
-	// Here we manually curated a list of editable settings
 
 	values := make(map[string]interface{})
 	keys := []string{
@@ -61,6 +98,8 @@ func NewConfigModel() (ConfigModel, error) {
 		keys:   keys,
 		values: values,
 		cursor: 0,
+		width:  100,
+		height: 24,
 	}, nil
 }
 
@@ -93,23 +132,12 @@ func (m ConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = ConfigStateEdit
 				m.editKey = m.keys[m.cursor]
 				m.editVal = fmt.Sprintf("%v", m.values[m.editKey])
-
-				// Launch huh form for simple editing?
-				// To keep it simple in this model, we'll just return a command to run an input form
-				// But tea.Model can't easily spawn a blocking huh form and return.
-				// We'll use a simple callback approach or just implement a text input here.
-				// For "Sexy", let's use the Runner pattern again or just use huh inside the update loop?
-				// Creating a new tea program inside Update is tricky.
-				// simpler: just quit with a specific exit code/action and let the runner handle it?
-				// OR: integrate bubbles/textinput.
-
-				// Let's stick to list view for now, and rely on `config set` for edits,
-				// or implement a text input within this model later.
-				// For this iteration, let's treat "Enter" as "I want to edit this", quit, and let the caller handle it?
-				// Or better: use `RunConfigMenu` to return the key to edit.
 				return m, tea.Quit
 			}
 		}
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 	}
 	return m, nil
 }
@@ -117,27 +145,92 @@ func (m ConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m ConfigModel) View() string {
 	var s strings.Builder
 
-	s.WriteString(titleStyle.Render("⚙️ Configuration Manager"))
+	// Calculate layout
+	totalWidth := m.width
+	if totalWidth < 80 {
+		totalWidth = 80
+	}
+	if totalWidth > 100 {
+		totalWidth = 100
+	}
+
+	// Header - centered
+	header := configTitleStyle.Render("⚙️  Configuration Manager")
+	headerLine := lipgloss.NewStyle().Width(totalWidth).Align(lipgloss.Center).Render(header)
+	s.WriteString(headerLine)
 	s.WriteString("\n\n")
+
+	// Two-column layout
+	colGap := 4
+	leftWidth := (totalWidth - colGap) * 2 / 3
+	rightWidth := totalWidth - leftWidth - colGap
+
+	// LEFT: Config keys/values
+	var configContent strings.Builder
+	configContent.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#9D76FF")).Render("📋 Settings"))
+	configContent.WriteString("\n\n")
 
 	for i, key := range m.keys {
 		val := m.values[key]
-		cursor := " "
 		if m.cursor == i {
-			cursor = "👉"
-			s.WriteString(selectedStyle.Render(fmt.Sprintf("%s %-20s : %v", cursor, key, val)))
+			configContent.WriteString("▸ ")
+			configContent.WriteString(configSelectedKeyStyle.Render(key))
+			configContent.WriteString(configSelectedValueStyle.Render(fmt.Sprintf("%v", val)))
 		} else {
-			s.WriteString(fmt.Sprintf("%s %-20s : %v", cursor, key, val))
+			configContent.WriteString("  ")
+			configContent.WriteString(configKeyStyle.Render(key))
+			configContent.WriteString(configValueStyle.Render(fmt.Sprintf("%v", val)))
 		}
-		s.WriteString("\n")
+		configContent.WriteString("\n")
 	}
 
-	s.WriteString("\n")
-	s.WriteString(descriptionStyle.Render("↑/↓: Navigate | Enter: Edit | Esc: Exit"))
+	leftPanel := configBoxStyle.Width(leftWidth).Render(configContent.String())
+
+	// RIGHT: Help/context panel
+	var helpContent strings.Builder
+	helpContent.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#888")).Render("💡 Quick Help"))
+	helpContent.WriteString("\n\n")
+
+	selectedKey := m.keys[m.cursor]
+	switch selectedKey {
+	case "provider":
+		helpContent.WriteString("Default cloud provider\nfor deployments.\n\nOptions: azure, aws,\ngcp, local, hetzner")
+	case "environment":
+		helpContent.WriteString("Deployment environment.\n\nOptions: development,\nstaging, production")
+	case "local.app_port":
+		helpContent.WriteString("Port for local Coolify\nweb interface.\n\nDefault: 8000")
+	case "local.websocket_port":
+		helpContent.WriteString("WebSocket port for\nreal-time updates.\n\nDefault: 6001")
+	case "azure.location":
+		helpContent.WriteString("Azure region for\nresource deployment.\n\nExample: eastus, westus2")
+	case "azure.vm_size":
+		helpContent.WriteString("Azure VM size for\nCoolify host.\n\nRecommended: Standard_B2s")
+	default:
+		helpContent.WriteString("Select a setting to\nview more information.")
+	}
+
+	rightPanel := configHelpBoxStyle.Width(rightWidth).Render(helpContent.String())
+
+	// Join panels
+	gap := strings.Repeat(" ", colGap)
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, gap, rightPanel)
+	s.WriteString(panels)
+	s.WriteString("\n\n")
+
+	// Footer - centered
+	footerParts := []string{
+		configFooterKeyStyle.Render("↑↓") + " navigate",
+		configFooterKeyStyle.Render("Enter") + " edit",
+		configFooterKeyStyle.Render("Esc") + " exit",
+	}
+	footer := configFooterStyle.Render(strings.Join(footerParts, "  │  "))
+	footerLine := lipgloss.NewStyle().Width(totalWidth).Align(lipgloss.Center).Render(footer)
+	s.WriteString(footerLine)
+
 	return s.String()
 }
 
-// RunConfigMenu runs the config menu and returns the selected key to edit (or empty if exit)
+// RunConfigMenu runs the config menu and returns the selected key to edit
 func RunConfigMenu() (string, error) {
 	model, err := NewConfigModel()
 	if err != nil {
