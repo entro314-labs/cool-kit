@@ -64,8 +64,8 @@ jobs:
         run: |
           docker buildx ls
           docker run --privileged --rm tonistiigi/binfmt --install all
-          # Get the current builder name
-          BUILDER_NAME=$(docker buildx ls | grep '\*' | awk '{print $1}' | tr -d '*')
+          # Get the current builder name robustly
+          BUILDER_NAME=$(docker buildx inspect --format '{{.Name}}')
           echo "Current builder: $BUILDER_NAME"
           echo "BUILDER_NAME=$BUILDER_NAME" >> $GITHUB_ENV
 
