@@ -18,7 +18,10 @@ This command group provides tools to provision Hetzner Cloud servers, deploy Coo
 manage instances, and configure deployments using the official Hetzner Cloud SDK.
 
 Authentication:
-  Set HCLOUD_TOKEN environment variable or configure in cool-kit config.`,
+  Set HCLOUD_TOKEN environment variable or configure in cool-kit config.
+  
+  Don't have a Hetzner account? Sign up with our referral link to support Coolify:
+  https://coolify.io/hetzner (or https://console.hetzner.com/refer?pk_campaign=referral-invite&pk_medium=referral-program&pk_source=reflink&pk_content=VBVO47VycYLt)`,
 }
 
 var hetznerDeployCmd = &cobra.Command{

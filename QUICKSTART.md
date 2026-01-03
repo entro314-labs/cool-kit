@@ -11,30 +11,37 @@ Install → Run → Choose → Deploy → Access Dashboard
 ## 📦 **Installation**
 
 ### **Option 1: Download Binary (Recommended)**
+
 ```bash
 # Download latest release
-curl -fsSL https://get.coolify.io/cli | bash
+# Download latest release
+curl -fsSL https://github.com/entro314-labs/cool-kit/releases/latest/download/cool-kit-linux-amd64 -o cool-kit
+chmod +x cool-kit
+sudo mv cool-kit /usr/local/bin/
 
 # Or download specific version
-wget https://github.com/coolify/cli/releases/latest/download/coolify-linux-amd64
-chmod +x coolify-linux-amd64
-sudo mv coolify-linux-amd64 /usr/local/bin/coolify
+# Or download specific version
+wget https://github.com/entro314-labs/cool-kit/releases/latest/download/cool-kit-linux-amd64
+chmod +x cool-kit-linux-amd64
+sudo mv cool-kit-linux-amd64 /usr/local/bin/cool-kit
 ```
 
 ### **Option 2: Build from Source**
+
 ```bash
 # Clone repository
-git clone https://github.com/coolify/cli.git
-cd cli
+# Clone repository
+git clone https://github.com/entro314-labs/cool-kit.git
+cd cool-kit
 
 # Install dependencies
 go mod download
 
 # Build
-go build -o coolify cmd/coolify/main.go
+go build -o cool-kit main.go
 
 # Install
-sudo mv coolify /usr/local/bin/
+sudo mv cool-kit /usr/local/bin/
 ```
 
 ---
@@ -42,11 +49,13 @@ sudo mv coolify /usr/local/bin/
 ## 🎯 **Usage - The Complete Flow**
 
 ### **Step 1: Run the CLI**
+
 ```bash
-coolify
+cool-kit
 ```
 
 ### **Step 2: Beautiful TUI Interface**
+
 You'll see a sexy terminal interface:
 
 ```
@@ -141,9 +150,9 @@ When deployment completes:
    3. Start deploying your applications!
 
 💡 Quick Commands:
-   coolify status   - Check deployment status
-   coolify update   - Update to latest Coolify version
-   coolify --help   - View all available commands
+   cool-kit status   - Check deployment status
+   cool-kit update   - Update to latest Coolify version
+   cool-kit --help   - View all available commands
 
 ✨ Happy deploying with Coolify! ✨
 ```
@@ -153,8 +162,9 @@ When deployment completes:
 ## 🎨 **Provider-Specific Examples**
 
 ### **Azure**
+
 ```bash
-coolify
+cool-kit
 
 # Select "Azure" from menu
 # CLI automatically:
@@ -166,8 +176,9 @@ coolify
 ```
 
 ### **AWS**
+
 ```bash
-coolify
+cool-kit
 
 # Select "AWS" from menu
 # CLI automatically:
@@ -179,8 +190,9 @@ coolify
 ```
 
 ### **Google Cloud**
+
 ```bash
-coolify
+cool-kit
 
 # Select "Google Cloud" from menu
 # CLI automatically:
@@ -192,8 +204,9 @@ coolify
 ```
 
 ### **Bare Metal / VM**
+
 ```bash
-coolify
+cool-kit
 
 # Select "Bare Metal / VM" from menu
 # Enter your server details:
@@ -209,8 +222,9 @@ coolify
 ```
 
 ### **Docker (Local)**
+
 ```bash
-coolify
+cool-kit
 
 # Select "Docker / Docker Compose" from menu
 # CLI automatically:
@@ -226,19 +240,23 @@ coolify
 ## 🔧 **Prerequisites**
 
 ### **All Deployments**
+
 - Internet connection
 - Terminal access
 
 ### **Cloud Providers**
-- **Azure**: Azure CLI installed + `az login`
+
+- **Azure**: Authenticated session (run `az login` or Set `AZURE_AUTH_LOCATION`)
 - **AWS**: AWS CLI installed + `aws configure`
 - **GCP**: gcloud CLI installed + `gcloud auth login`
 
 ### **Bare Metal / VM**
+
 - SSH access to target server
 - Ubuntu/Debian/CentOS/RHEL server
 
 ### **Docker (Local)**
+
 - Docker installed and running
 - Docker Compose installed
 
@@ -247,30 +265,35 @@ coolify
 ## 💡 **Key Features**
 
 ### **✅ Hands-Off Deployment**
+
 - No manual configuration needed
 - Automatic credential generation
 - Smart defaults for everything
 - One command to deploy
 
 ### **✅ Latest Coolify Always**
+
 - Pulls from official GitHub repository
 - Uses main/master branch
 - Always up-to-date
 - No stale versions
 
 ### **✅ Beautiful Interface**
+
 - Real-time progress tracking
 - Color-coded logs
 - Step-by-step visualization
 - Professional appearance
 
 ### **✅ Multi-Cloud Support**
+
 - Azure, AWS, GCP
 - Bare metal servers
 - Local Docker
 - Consistent experience everywhere
 
 ### **✅ Production Ready**
+
 - Secure credential generation
 - Health checks and validation
 - Proper error handling
@@ -283,6 +306,7 @@ coolify
 The CLI deploys the complete Coolify stack:
 
 ### **Services**
+
 - **Coolify App** - Main application (port 8000)
 - **PostgreSQL** - Database (port 5432)
 - **Redis** - Cache and queues (port 6379)
@@ -290,6 +314,7 @@ The CLI deploys the complete Coolify stack:
 - **Queue Worker** - Background jobs
 
 ### **Configuration**
+
 - Secure APP_KEY generated
 - Random database passwords
 - Redis authentication
@@ -297,6 +322,7 @@ The CLI deploys the complete Coolify stack:
 - All environment variables
 
 ### **Networking**
+
 - Proper port exposure
 - Health checks configured
 - Service dependencies
@@ -307,20 +333,26 @@ The CLI deploys the complete Coolify stack:
 ## 🎯 **After Deployment**
 
 ### **1. Access Dashboard**
+
 Open the provided URL in your browser:
+
 ```
 http://your-server-ip:8000
 ```
 
 ### **2. Initial Setup**
+
 Complete the Coolify setup wizard:
+
 - Create admin account
 - Configure settings
 - Add SSH keys
 - Connect servers
 
 ### **3. Start Deploying**
+
 Use Coolify to deploy your applications:
+
 - Connect Git repositories
 - Deploy Docker containers
 - Manage databases
@@ -332,13 +364,13 @@ Use Coolify to deploy your applications:
 
 ```bash
 # Update to latest version
-coolify update
+cool-kit update
 
 # Check current status
-coolify status
+cool-kit status
 
 # View version info
-coolify version
+cool-kit version
 ```
 
 ---
@@ -346,38 +378,41 @@ coolify version
 ## 🆘 **Troubleshooting**
 
 ### **Deployment Failed**
+
 ```bash
 # Check logs
-coolify logs
+cool-kit logs
 
 # Retry deployment
-coolify deploy --retry
+cool-kit deploy --retry
 
 # Clean and redeploy
-coolify clean
-coolify deploy
+cool-kit clean
+cool-kit deploy
 ```
 
 ### **Can't Access Dashboard**
+
 ```bash
 # Check service status
-coolify status
+cool-kit status
 
 # Restart services
-coolify restart
+cool-kit restart
 
 # View health checks
-coolify health
+cool-kit health
 ```
 
 ### **Need Help**
+
 ```bash
 # View all commands
-coolify --help
+cool-kit --help
 
 # Get provider-specific help
-coolify azure --help
-coolify aws --help
+cool-kit azure --help
+cool-kit aws --help
 ```
 
 ---
@@ -387,7 +422,7 @@ coolify aws --help
 The Coolify CLI makes deploying Coolify as simple as:
 
 1. **Install** the CLI
-2. **Run** `coolify`
+2. **Run** `cool-kit`
 3. **Choose** your provider
 4. **Wait** for automatic deployment
 5. **Access** your dashboard
@@ -401,7 +436,7 @@ The Coolify CLI makes deploying Coolify as simple as:
 - **Official Docs**: https://coolify.io/docs
 - **GitHub**: https://github.com/coollabsio/coolify
 - **Discord**: https://discord.gg/coolify
-- **CLI Issues**: https://github.com/coolify/cli/issues
+- **CLI Issues**: https://github.com/entro314-labs/cool-kit/issues
 
 ---
 

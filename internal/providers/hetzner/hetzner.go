@@ -25,6 +25,10 @@ func NewHetznerProvider(cfg *config.Config) (*HetznerProvider, error) {
 		token = cfg.Settings["hetzner_token"].(string)
 	}
 
+	if token == "" {
+		return nil, fmt.Errorf("Hetzner Cloud token is required. Set HCLOUD_TOKEN or use config.\nSign up at: https://coolify.io/hetzner")
+	}
+
 	client, err := NewClient(token)
 	if err != nil {
 		return nil, err

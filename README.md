@@ -13,7 +13,7 @@ Cool-Kit provides a comprehensive suite of commands for deploying, managing, and
 ## ✨ Features
 
 - 🏠 **Local Development** - Complete local Coolify setup with Docker Compose
-- ☁️ **Azure Deployment** - Full Azure VM provisioning and Coolify deployment
+- ☁️ **Cloud Deployment** - Full Azure, AWS, GCP, DigitalOcean, and Hetzner provisioning features
 - 🔄 **Smart Updates** - Automatic updates with backup and rollback
 - 💾 **Backup Management** - Create, list, and restore backups
 - 📊 **Status Monitoring** - Comprehensive health checks and resource monitoring
@@ -26,6 +26,7 @@ Cool-Kit provides a comprehensive suite of commands for deploying, managing, and
 ## 📋 Requirements
 
 ### System Requirements
+
 - **OS**: Linux, macOS, or Windows
 - **RAM**: 2GB minimum (4GB recommended for local, 8GB for Azure)
 - **Disk**: 20GB available space
@@ -34,11 +35,13 @@ Cool-Kit provides a comprehensive suite of commands for deploying, managing, and
 ### Prerequisites
 
 #### For Local Development
+
 - Docker 20.10+
 - Docker Compose v2+
 
 #### For Azure Deployment
-- Azure CLI (`az` command)
+
+- Authenticated Azure session (via `az login` or Service Principal)
 - Azure account with subscription
 - SSH key pair (`~/.ssh/id_rsa.pub`)
 
@@ -49,18 +52,20 @@ Cool-Kit provides a comprehensive suite of commands for deploying, managing, and
 ### Installation
 
 #### Download Pre-built Binary (Recommended)
+
 ```bash
 # Download latest release (coming soon)
-curl -fsSL https://github.com/coollabsio/cool-kit/releases/latest/download/cool-kit-linux-amd64 -o cool-kit
+curl -fsSL https://github.com/entro314-labs/cool-kit/releases/latest/download/cool-kit-linux-amd64 -o cool-kit
 chmod +x cool-kit
 sudo mv cool-kit /usr/local/bin/
 ```
 
 #### Build from Source
+
 ```bash
 # Clone repository
-git clone https://github.com/coollabsio/coolify.git
-cd coolify/cool-kit
+git clone https://github.com/entro314-labs/cool-kit.git
+cd cool-kit
 
 # Build with Go
 go build -o cool-kit
@@ -94,6 +99,7 @@ Manage Coolify instances on your local machine using Docker Compose.
 ### `cool-kit local setup`
 
 Interactive setup for local Coolify development:
+
 - Collects configuration (email, password, ports)
 - Generates secure credentials automatically
 - Creates required directory structure
@@ -139,6 +145,7 @@ cool-kit local logs coolify
 ### `cool-kit local update`
 
 Update to latest Coolify version:
+
 - Pulls latest Docker images
 - Recreates containers
 - Runs database migrations
@@ -169,6 +176,7 @@ Deploy and manage Coolify instances on Microsoft Azure.
 ### `cool-kit azure deploy`
 
 Complete Azure deployment workflow:
+
 1. **Load Configuration** - Interactive or from file
 2. **Provision Infrastructure**:
    - Resource group
@@ -191,12 +199,14 @@ cool-kit azure deploy
 ```
 
 **What you'll be asked:**
+
 - Resource Group name (default: `coolify-rg`)
 - VM name (default: `coolify-vm`)
 - Admin email
 - Admin password
 
 **What you get:**
+
 - Fully provisioned Azure VM
 - Coolify running on `http://<public-ip>:8000`
 - SSH access via `ssh azureuser@<public-ip>`
@@ -204,6 +214,7 @@ cool-kit azure deploy
 ### `cool-kit azure update`
 
 Update existing Azure instance with automatic rollback:
+
 - Creates pre-update backup
 - Pulls latest images
 - Recreates containers
@@ -218,6 +229,7 @@ cool-kit azure update
 ### `cool-kit azure status`
 
 Comprehensive health check:
+
 - ✅ VM status (power state, provisioning)
 - ✅ SSH connectivity
 - ✅ Service health (Coolify, DB, Redis, Realtime)
@@ -231,6 +243,7 @@ cool-kit azure status
 ### `cool-kit azure backup`
 
 Create full backup:
+
 - PostgreSQL database dump
 - Redis data
 - Docker volumes (applications, services, etc.)
@@ -244,6 +257,7 @@ cool-kit azure backup
 ### `cool-kit azure rollback`
 
 Restore from backup:
+
 - Lists available backups
 - Interactive selection
 - Complete restoration
@@ -256,6 +270,7 @@ cool-kit azure rollback
 ### `cool-kit azure config`
 
 Manage Azure configuration:
+
 1. View current configuration
 2. Edit configuration file
 3. Validate configuration
@@ -311,6 +326,7 @@ Default configuration is created at `~/.coolify/azure-config.json`:
 ```
 
 Customize before deployment:
+
 ```bash
 # Edit configuration
 cool-kit azure config
@@ -320,6 +336,7 @@ cool-kit azure config
 ### Local Configuration
 
 Local setup is interactive - you'll be prompted for:
+
 - Admin email
 - Admin password (or auto-generated)
 - App port (default: 8000)
@@ -332,18 +349,21 @@ Configuration is saved to `~/.coolify/local-config.json`
 ## 🔐 Security
 
 ### Credentials
+
 - All passwords generated with `crypto/rand` (cryptographically secure)
 - Minimum 32 characters for sensitive credentials
 - SSH key-based authentication for Azure
 - No credentials stored in plaintext (except config files you create)
 
 ### Azure Security
+
 - Network Security Group with minimal required ports
 - SSH key authentication (no password login)
 - Automatic system updates on first boot
 - Secure credential generation for all services
 
 ### Best Practices
+
 - ✅ Always use strong passwords
 - ✅ Keep SSH keys secure
 - ✅ Regularly update Coolify (`cool-kit azure update`)
@@ -393,6 +413,7 @@ Azure Resources:
 ### Local Development
 
 **Docker not running:**
+
 ```bash
 # Start Docker Desktop (macOS/Windows)
 # Or start Docker daemon (Linux):
@@ -400,6 +421,7 @@ sudo systemctl start docker
 ```
 
 **Port 8000 already in use:**
+
 ```bash
 # Find what's using it
 lsof -i :8000
@@ -408,6 +430,7 @@ lsof -i :8000
 ```
 
 **Services not healthy:**
+
 ```bash
 # Check logs
 cool-kit local logs -f
@@ -419,18 +442,14 @@ cool-kit local setup
 
 ### Azure Deployment
 
-**Azure CLI not found:**
-```bash
-# Install Azure CLI
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-```
-
 **Not logged into Azure:**
+
 ```bash
-az login
+`az login` works best for local development. For CI/CD, use Service Principals.
 ```
 
 **SSH connection fails:**
+
 ```bash
 # Verify SSH key exists
 ls -la ~/.ssh/id_rsa.pub
@@ -440,6 +459,7 @@ ssh-keygen -t rsa -b 4096
 ```
 
 **Deployment fails:**
+
 - Check Azure CLI authentication: `az account show`
 - Verify subscription has quota
 - Check network connectivity
@@ -449,9 +469,10 @@ ssh-keygen -t rsa -b 4096
 
 ## 🛣️ Roadmap
 
-- [ ] AWS deployment support
-- [ ] Google Cloud deployment support
-- [ ] DigitalOcean deployment support
+- [x] AWS deployment support
+- [x] Google Cloud deployment support
+- [x] DigitalOcean deployment support
+- [x] Hetzner deployment support
 - [ ] Kubernetes deployment support
 - [ ] Monitoring stack integration
 - [ ] Service template deployment
@@ -475,8 +496,8 @@ We welcome contributions!
 ### Development Setup
 
 ```bash
-git clone https://github.com/coollabsio/coolify.git
-cd coolify/cool-kit
+git clone https://github.com/entro314-labs/cool-kit.git
+cd cool-kit
 
 # Install dependencies
 go mod tidy
@@ -526,9 +547,19 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
+## ❤️ Support Coolify
+
+Coolify is an open-source project. If you use **Hetzner Cloud** for your deployments, please consider using our referral link. It helps support the project at no extra cost to you!
+
+- **Sign up for Hetzner**: [https://coolify.io/hetzner](https://coolify.io/hetzner)
+- **Direct Link**: [Hetzner Console](https://console.hetzner.com/refer?pk_campaign=referral-invite&pk_medium=referral-program&pk_source=reflink&pk_content=VBVO47VycYLt)
+
+---
+
 ## 🎉 Acknowledgments
 
 Cool-Kit is the result of migrating **3,397 lines of bash scripts** to **~3,800 lines of type-safe Go code**, providing:
+
 - ✅ Cross-platform compatibility
 - ✅ Better error handling
 - ✅ Interactive user experience
