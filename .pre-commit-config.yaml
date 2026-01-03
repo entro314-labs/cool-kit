@@ -5,7 +5,7 @@
 repos:
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -20,31 +20,30 @@ repos:
         args: ['--fix=lf']
 
   # Go hooks
-  - repo: https://github.com/dnephin/pre-commit-golang
-    rev: v0.5.1
+  - repo: https://github.com/tekwizely/pre-commit-golang
+    rev: v1.0.0-rc.4
     hooks:
-      - id: go-fmt
-      - id: go-vet
       - id: go-mod-tidy
-      - id: go-build
+      - id: go-vet
+      - id: go-build-mod
 
   # golangci-lint
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.0.2
+    rev: v2.7.2
     hooks:
       - id: golangci-lint
         args: [--timeout=5m]
 
   # Markdown
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.44.0
+    rev: v0.47.0
     hooks:
       - id: markdownlint
         args: ['--fix', '--disable', 'MD013', 'MD033', 'MD041', '--']
 
   # YAML
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.35.1
+    rev: v1.37.1
     hooks:
       - id: yamllint
         args: [-c, .yamllint.yaml]
@@ -52,6 +51,6 @@ repos:
 
   # Secrets detection
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.24.0
+    rev: v8.30.0
     hooks:
       - id: gitleaks

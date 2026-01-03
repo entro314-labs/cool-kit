@@ -66,10 +66,6 @@ linters:
       min-complexity: 30
 
     gocritic:
-      tags:
-        - diagnostic
-        - style
-        - performance
       disabled-checks:
         - hugeParam  # We pass some larger structs around
 

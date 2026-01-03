@@ -8,8 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN groupadd -r app && useradd -r -g app app
 
-# GoReleaser copies the binary to the root of the context
-COPY cool-kit /usr/local/bin/cool-kit
+# GoReleaser v2 places binaries in subdirectories matching the target platform
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/cool-kit /usr/local/bin/cool-kit
 RUN chmod +x /usr/local/bin/cool-kit
 
 USER app
