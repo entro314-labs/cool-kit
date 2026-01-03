@@ -9,6 +9,8 @@
 
 version: 2
 
+
+
 project_name: cool-kit
 
 # =============================================================================
@@ -174,26 +176,32 @@ release:
 # =============================================================================
 # Homebrew (uncomment when homebrew-tap repo is created)
 # =============================================================================
-# brews:
-#   - name: cool-kit
-#     repository:
-#       owner: entro314-labs
-#       name: homebrew-tap
-#       branch: main
-#       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-#     directory: Formula
-#     homepage: https://github.com/entro314-labs/cool-kit
-#     description: "CLI toolkit for Coolify deployments"
-#     license: MIT
-#     commit_author:
-#       name: goreleaserbot
-#       email: bot@goreleaser.com
-#     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-#     install: |
-#       bin.install "cool-kit"
-#       generate_completions_from_executable(bin/"cool-kit", "completion")
-#     test: |
-#       system "#{bin}/cool-kit", "--version"
+homebrew_casks:
+  - name: cool-kit
+    repository:
+      owner: entro314-labs
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: https://github.com/entro314-labs/cool-kit
+    description: "CLI toolkit for Coolify deployments"
+    license: MIT
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Homebrew Cask update for {{ .ProjectName }} version {{ .Tag }}"
+    
+    # Casks use declarative binaries and completions, not Ruby install scripts
+    binaries:
+      - cool-kit
+    
+    # Define completions if you generate them in your build or have them in the repo
+    # Assuming completions are generated/available
+    # completions:
+    #   bash: completions/cool-kit.bash
+    #   zsh: completions/cool-kit.zsh
+    #   fish: completions/cool-kit.fish
 
 # =============================================================================
 # Linux packages (deb/rpm)
@@ -216,24 +224,33 @@ nfpms:
 # =============================================================================
 # Docker
 # =============================================================================
-dockers:
-  - image_templates:
-      - "ghcr.io/entro314-labs/cool-kit:{{ .Version }}"
-      - "ghcr.io/entro314-labs/cool-kit:latest"
-      - "ghcr.io/entro314-labs/cool-kit:{{ .Version }}-amd64"
-      - "ghcr.io/entro314-labs/cool-kit:{{ .Version }}-arm64"
+dockers_v2:
+  - ids:
+      - cool-kit
     dockerfile: Dockerfile.goreleaser
-    use: buildx
-    goos: linux
-    goarch: amd64 # Placeholder, buildx handles platforms
-    build_flag_templates:
+    
+    images:
+      - "ghcr.io/entro314-labs/cool-kit"
+    
+    tags:
+      - "{{ .Version }}"
+      - "latest"
+      - "{{ .Version }}-amd64"
+      - "{{ .Version }}-arm64"
+    
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    
+    flags:
       - "--pull"
-      - "--platform=linux/amd64,linux/arm64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://github.com/entro314-labs/cool-kit"
+      
+    labels:
+      "org.opencontainers.image.created": "{{.Date}}"
+      "org.opencontainers.image.title": "{{.ProjectName}}"
+      "org.opencontainers.image.revision": "{{.FullCommit}}"
+      "org.opencontainers.image.version": "{{.Version}}"
+      "org.opencontainers.image.source": "https://github.com/entro314-labs/cool-kit"
 
 
 # =============================================================================

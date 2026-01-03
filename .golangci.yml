@@ -1,7 +1,7 @@
 # golangci-lint configuration for cool-kit
 # https://golangci-lint.run/usage/configuration/
 
-version: 2
+version: "2"
 
 run:
   timeout: 5m
@@ -50,58 +50,59 @@ linters:
   disable:
     - depguard  # We don't need import allowlists
 
-  # v2: Settings are now per-linter
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-    exclude-functions:
-      - io.Copy
-      - (io.Closer).Close
+  # v2: Settings are under 'settings' key
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - io.Copy
+        - (io.Closer).Close
 
-  gocyclo:
-    min-complexity: 20
+    gocyclo:
+      min-complexity: 20
 
-  gocognit:
-    min-complexity: 30
+    gocognit:
+      min-complexity: 30
 
-  gocritic:
-    tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - hugeParam  # We pass some larger structs around
+    gocritic:
+      tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - hugeParam  # We pass some larger structs around
 
-  gosec:
-    excludes:
-      - G104  # Audit errors not checked (we use errcheck)
-      - G304  # Potential file inclusion via variable (needed for config files)
+    gosec:
+      excludes:
+        - G104  # Audit errors not checked (we use errcheck)
+        - G304  # Potential file inclusion via variable (needed for config files)
 
-  misspell:
-    locale: US
+    misspell:
+      locale: US
 
-  revive:
-    rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
 
   # v2: Exclusions are here
   exclusions:
