@@ -8,7 +8,7 @@
 # Build arguments
 # =============================================================================
 ARG GO_VERSION=1.25
-ARG UBUNTU_VERSION=24.04
+ARG DEBIAN_VERSION=trixie
 ARG BUILD_VERSION=dev
 ARG BUILD_DATE=unknown
 ARG GIT_COMMIT=unknown
@@ -16,10 +16,10 @@ ARG GIT_COMMIT=unknown
 # =============================================================================
 # Builder stage
 # =============================================================================
-FROM golang:${GO_VERSION}-ubuntu${UBUNTU_VERSION} AS builder
+FROM golang:${GO_VERSION}-debian${DEBIAN_VERSION} AS builder
 
 # Install build dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     ca-certificates \
     git \
     make \
@@ -53,14 +53,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # =============================================================================
 # Runtime stage (minimal)
 # =============================================================================
-FROM ubuntu:${UBUNTU_VERSION} AS runtime
+FROM debian:${DEBIAN_VERSION} AS runtime
 
 # Install runtime dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     ca-certificates \
     git \
     tzdata \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/cache/apt/archives/*
 
 # Create non-root user
 RUN addgroup -g 1000 app \
