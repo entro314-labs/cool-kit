@@ -63,8 +63,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/cache/apt/archives/*
 
 # Create non-root user
-RUN addgroup -g 1000 app \
-    && adduser -u 1000 -G app -s /bin/sh -D app
+RUN groupadd -g 1000 app \
+    && useradd -u 1000 -g app -s /bin/sh app
 
 # Copy binary from builder
 COPY --from=builder /cool-kit /usr/local/bin/cool-kit
