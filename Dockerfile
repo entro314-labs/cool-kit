@@ -16,7 +16,7 @@ ARG GIT_COMMIT=unknown
 # =============================================================================
 # Builder stage
 # =============================================================================
-FROM golang:${GO_VERSION}-debian${DEBIAN_VERSION} AS builder
+FROM golang:{DEBIAN_VERSION} AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
