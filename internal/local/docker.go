@@ -21,7 +21,7 @@ func CheckPrerequisites() error {
 
 	cmd := exec.CommandContext(ctx, "docker", "info")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Docker is not running. Please start Docker")
+		return fmt.Errorf("docker is not running. Please start Docker")
 	}
 
 	// Check Docker Compose

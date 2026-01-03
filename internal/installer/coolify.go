@@ -1,3 +1,4 @@
+// Package installer handles Coolify installation.
 package installer
 
 import (
@@ -120,7 +121,7 @@ func (d *CoolifyDeployer) downloadInstaller() error {
 
 	// Create temporary directory
 	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("coolify-cli-%d", time.Now().Unix()))
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+	if err := os.MkdirAll(tmpDir, 0750); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
@@ -148,7 +149,7 @@ func (d *CoolifyDeployer) downloadInstaller() error {
 	}
 
 	// Make executable
-	if err := os.Chmod(scriptPath, 0755); err != nil {
+	if err := os.Chmod(scriptPath, 0750); err != nil {
 		return fmt.Errorf("failed to make script executable: %w", err)
 	}
 

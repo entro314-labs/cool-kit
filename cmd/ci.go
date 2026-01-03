@@ -60,7 +60,7 @@ func runCIGithub(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create directory
-	if err := os.MkdirAll(workflowDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowDir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -93,7 +93,7 @@ jobs:
 `, ciBranch, appUUIDValue)
 
 	// Write file
-	if err := os.WriteFile(workflowFile, []byte(workflow), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflow), 0600); err != nil {
 		return fmt.Errorf("failed to write workflow file: %w", err)
 	}
 

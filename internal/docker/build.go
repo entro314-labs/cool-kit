@@ -1,3 +1,4 @@
+// Package docker handles Docker image building and pushing.
 package docker
 
 import (
@@ -34,7 +35,7 @@ func Build(opts *BuildOptions) (err error) {
 	if _, statErr := os.Stat(dockerfilePath); os.IsNotExist(statErr) {
 		content := GenerateDockerfile(opts.Framework)
 		tempDockerfilePath := filepath.Join(opts.Dir, "Dockerfile.cdp")
-		if writeErr := os.WriteFile(tempDockerfilePath, []byte(content), 0644); writeErr != nil {
+		if writeErr := os.WriteFile(tempDockerfilePath, []byte(content), 0600); writeErr != nil {
 			return fmt.Errorf("failed to write Dockerfile: %w", writeErr)
 		}
 		dockerfilePath = tempDockerfilePath
@@ -46,11 +47,11 @@ func Build(opts *BuildOptions) (err error) {
 		defer func() {
 			// Recover from panic if any, clean up, then re-panic
 			if r := recover(); r != nil {
-				os.Remove(dockerfilePath)
+				_ = os.Remove(dockerfilePath)
 				panic(r)
 			}
 			// Normal cleanup
-			os.Remove(dockerfilePath)
+			_ = os.Remove(dockerfilePath)
 		}()
 	}
 

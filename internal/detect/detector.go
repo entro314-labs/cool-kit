@@ -1,3 +1,4 @@
+// Package detect handles framework and service detection.
 package detect
 
 import (
@@ -438,21 +439,6 @@ func detectGo(dir string) (*FrameworkInfo, error) {
 		StartCommand: "./app",
 		Port:         "8080",
 		IsStatic:     false,
-	}, nil
-}
-
-func detectPython(dir string) (*FrameworkInfo, error) {
-	installCmd := "pip install -r requirements.txt"
-	if fileExists(filepath.Join(dir, "pyproject.toml")) {
-		installCmd = "pip install ."
-	}
-
-	return &FrameworkInfo{
-		Name:           "Python",
-		BuildPack:      BuildPackNixpacks,
-		InstallCommand: installCmd,
-		Port:           "8000",
-		IsStatic:       false,
 	}, nil
 }
 

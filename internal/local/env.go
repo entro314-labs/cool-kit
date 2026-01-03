@@ -93,12 +93,12 @@ SSH_MUX_ENABLED=true
 	)
 
 	// Ensure directory exists
-	if err := os.MkdirAll(workDir, 0755); err != nil {
+	if err := os.MkdirAll(workDir, 0750); err != nil {
 		return fmt.Errorf("failed to create work directory: %w", err)
 	}
 
 	// Write environment file
-	if err := os.WriteFile(envPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(envPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write environment file: %w", err)
 	}
 
@@ -123,7 +123,7 @@ func CreateDirectoryStructure(workDir string) error {
 
 	for _, dir := range directories {
 		path := filepath.Join(workDir, dir)
-		if err := os.MkdirAll(path, 0755); err != nil {
+		if err := os.MkdirAll(path, 0750); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}

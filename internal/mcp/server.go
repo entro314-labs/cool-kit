@@ -1,3 +1,4 @@
+// Package mcp implements the Model Context Protocol server.
 package mcp
 
 import (
@@ -42,8 +43,15 @@ func (s *MCPServer) handleMessage(msg string) error {
 		return s.sendError(-32700, "Parse error", nil)
 	}
 
-	id, _ := req["id"].(float64)
-	method, _ := req["method"].(string)
+	id, ok := req["id"].(float64)
+	if !ok {
+		// id is optional or might be missing, but for JSON-RPC usually required for request/response matching
+		// We'll proceed with 0 if missing/invalid, assuming notification or we can't reply properly anyway
+	}
+	method, ok := req["method"].(string)
+	if !ok {
+		return s.sendError(int(id), "Invalid Request", nil)
+	}
 
 	switch method {
 	case "initialize":
@@ -225,9 +233,19 @@ func (s *MCPServer) handleToolsList(id float64) error {
 
 // handleToolsCall dispatches tool calls to the appropriate handler
 func (s *MCPServer) handleToolsCall(id float64, req map[string]interface{}) error {
-	params, _ := req["params"].(map[string]interface{})
-	name, _ := params["name"].(string)
-	args, _ := params["arguments"].(map[string]interface{})
+	params, ok := req["params"].(map[string]interface{})
+	if !ok {
+		// params are optional
+		params = make(map[string]interface{})
+	}
+	name, ok := params["name"].(string)
+	if !ok {
+		return s.sendError(int(id), "Invalid tool name", nil)
+	}
+	args, ok := params["arguments"].(map[string]interface{})
+	if !ok {
+		args = make(map[string]interface{})
+	}
 
 	var result interface{}
 	var err error
@@ -305,7 +323,10 @@ func (s *MCPServer) listApplications() (interface{}, error) {
 }
 
 func (s *MCPServer) getApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, _ := args["uuid"].(string)
+	uuid, ok := args["uuid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("uuid is required")
+	}
 	if uuid == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
@@ -331,7 +352,10 @@ func (s *MCPServer) getApplication(args map[string]interface{}) (interface{}, er
 }
 
 func (s *MCPServer) getApplicationLogs(args map[string]interface{}) (interface{}, error) {
-	uuid, _ := args["uuid"].(string)
+	uuid, ok := args["uuid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("uuid is required")
+	}
 	if uuid == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
@@ -367,7 +391,10 @@ func (s *MCPServer) getApplicationLogs(args map[string]interface{}) (interface{}
 }
 
 func (s *MCPServer) startApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, _ := args["uuid"].(string)
+	uuid, ok := args["uuid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("uuid is required")
+	}
 	if uuid == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
@@ -384,7 +411,10 @@ func (s *MCPServer) startApplication(args map[string]interface{}) (interface{}, 
 }
 
 func (s *MCPServer) stopApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, _ := args["uuid"].(string)
+	uuid, ok := args["uuid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("uuid is required")
+	}
 	if uuid == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
@@ -400,7 +430,10 @@ func (s *MCPServer) stopApplication(args map[string]interface{}) (interface{}, e
 }
 
 func (s *MCPServer) restartApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, _ := args["uuid"].(string)
+	uuid, ok := args["uuid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("uuid is required")
+	}
 	if uuid == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
@@ -417,7 +450,10 @@ func (s *MCPServer) restartApplication(args map[string]interface{}) (interface{}
 }
 
 func (s *MCPServer) deployApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, _ := args["uuid"].(string)
+	uuid, ok := args["uuid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("uuid is required")
+	}
 	if uuid == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
@@ -446,7 +482,10 @@ func (s *MCPServer) deployApplication(args map[string]interface{}) (interface{},
 }
 
 func (s *MCPServer) listDeployments(args map[string]interface{}) (interface{}, error) {
-	appUUID, _ := args["app_uuid"].(string)
+	appUUID, ok := args["app_uuid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("app_uuid must be a string")
+	}
 	if appUUID == "" {
 		return nil, fmt.Errorf("app_uuid is required")
 	}
@@ -471,7 +510,10 @@ func (s *MCPServer) listDeployments(args map[string]interface{}) (interface{}, e
 }
 
 func (s *MCPServer) getDeployment(args map[string]interface{}) (interface{}, error) {
-	deploymentUUID, _ := args["deployment_uuid"].(string)
+	deploymentUUID, ok := args["deployment_uuid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("deployment_uuid must be a string")
+	}
 	if deploymentUUID == "" {
 		return nil, fmt.Errorf("deployment_uuid is required")
 	}

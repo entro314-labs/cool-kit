@@ -88,7 +88,7 @@ func runBadgeInteractive() error {
 		return err
 	}
 	if appUUID == "" {
-		ui.Dim("Cancelled - no UUID provided")
+		ui.Dim("Canceled - no UUID provided")
 		return nil
 	}
 	return runBadge(badgeCmd, []string{appUUID})

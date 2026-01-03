@@ -1,3 +1,4 @@
+// Package cmd implements the command line interface for cool-kit.
 package cmd
 
 import (
@@ -6,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/entro314-labs/cool-kit/internal/config"
-	"github.com/spf13/cobra"
 )
 
 // checkLogin ensures the user is authenticated
@@ -41,17 +41,6 @@ func execName() string {
 		return "coolify-deployer"
 	}
 	return name
-}
-
-// getVerboseFlag returns the verbose flag value from the command
-func getVerboseFlag(cmd *cobra.Command) bool {
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	return verbose
-}
-
-// requireLogin is a helper to check login before command execution
-func requireLogin(cmd *cobra.Command, args []string) error {
-	return checkLogin()
 }
 
 // getWorkingDirName returns the name of the current working directory

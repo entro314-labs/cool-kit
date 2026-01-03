@@ -1,3 +1,4 @@
+// Package git handles Git repository operations.
 package git
 
 import (
@@ -67,7 +68,7 @@ func isGitRepo(dir string) bool {
 func (m *Manager) cloneFresh(workDir, repoURL, branch string) error {
 	// Create parent directory
 	parentDir := filepath.Dir(workDir)
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
+	if err := os.MkdirAll(parentDir, 0750); err != nil {
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
@@ -132,14 +133,20 @@ func (m *Manager) GetLatestCommitInfo() (*CommitInfo, error) {
 	// Get commit message
 	msgCmd := exec.Command("git", "log", "-1", "--format=%s")
 	msgCmd.Dir = absWorkDir
-	msgOutput, _ := msgCmd.Output()
-	message := strings.TrimSpace(string(msgOutput))
+	msgOutput, err := msgCmd.Output()
+	var message string
+	if err == nil {
+		message = strings.TrimSpace(string(msgOutput))
+	}
 
 	// Get author
 	authorCmd := exec.Command("git", "log", "-1", "--format=%an")
 	authorCmd.Dir = absWorkDir
-	authorOutput, _ := authorCmd.Output()
-	author := strings.TrimSpace(string(authorOutput))
+	authorOutput, err := authorCmd.Output()
+	var author string
+	if err == nil {
+		author = strings.TrimSpace(string(authorOutput))
+	}
 
 	shortHash := hash
 	if len(hash) > 8 {

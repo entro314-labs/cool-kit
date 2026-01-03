@@ -1,3 +1,4 @@
+// Package azureconfig handles Azure configuration loading.
 package azureconfig
 
 import (

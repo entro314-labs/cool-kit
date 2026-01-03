@@ -138,7 +138,7 @@ networks:
 `, cfg.WebSocketPort, cfg.AppPort)
 
 	// Write docker-compose file
-	if err := os.WriteFile(composePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(composePath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write docker-compose file: %w", err)
 	}
 

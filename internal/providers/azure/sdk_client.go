@@ -431,7 +431,7 @@ func (c *SDKClient) CreateVM(opts VMCreateOpts) (*VMInfo, error) {
 	return &VMInfo{
 		ID:       *resp.ID,
 		Name:     *resp.Name,
-		State:    string(*resp.Properties.ProvisioningState),
+		State:    *resp.Properties.ProvisioningState,
 		Location: c.location,
 	}, nil
 }
@@ -459,7 +459,7 @@ func (c *SDKClient) GetVM(name string) (*VMInfo, error) {
 	}
 
 	if resp.Properties != nil && resp.Properties.ProvisioningState != nil {
-		info.State = string(*resp.Properties.ProvisioningState)
+		info.State = *resp.Properties.ProvisioningState
 	}
 
 	return info, nil

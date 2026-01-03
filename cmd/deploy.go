@@ -101,7 +101,7 @@ func runDeploy() error {
 			return err
 		}
 		if !confirmed {
-			ui.Dim("Deployment cancelled")
+			ui.Dim("Deployment canceled")
 			return nil
 		}
 		// Confirmation already leaves a blank line, so just show the title

@@ -1,3 +1,4 @@
+// Package api provides a client for the Coolify API.
 package api
 
 import (
@@ -217,11 +218,6 @@ func (c *Client) doWithRetry(ctx context.Context, method, urlStr string, body []
 
 // Convenience methods that use context.Background() internally.
 // For cancellation support and timeouts, use the context-based methods below directly.
-
-// request performs an HTTP request (uses context.Background)
-func (c *Client) request(method, path string, body interface{}, result interface{}) error {
-	return c.doRequest(context.Background(), method, path, body, result)
-}
 
 // Get performs a GET request
 func (c *Client) Get(path string, result interface{}) error {

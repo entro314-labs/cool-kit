@@ -1,3 +1,4 @@
+// Package docker implements the Docker provider.
 package docker
 
 import (
@@ -169,7 +170,7 @@ REDIS_PASSWORD=%s
 		p.config.Settings["redis_password"],
 	)
 
-	if err := os.WriteFile(envFile, []byte(envContent), 0644); err != nil {
+	if err := os.WriteFile(envFile, []byte(envContent), 0600); err != nil {
 		return fmt.Errorf("failed to create .env file: %w", err)
 	}
 

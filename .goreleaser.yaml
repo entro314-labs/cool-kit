@@ -182,7 +182,7 @@ homebrew_casks:
       owner: entro314-labs
       name: homebrew-tap
       branch: main
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Casks
     homepage: https://github.com/entro314-labs/cool-kit
     description: "CLI toolkit for Coolify deployments"

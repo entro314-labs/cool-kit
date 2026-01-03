@@ -1,3 +1,4 @@
+// Package appdeploy handles application deployment logic.
 package appdeploy
 
 import (

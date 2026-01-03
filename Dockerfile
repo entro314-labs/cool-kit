@@ -8,7 +8,7 @@
 # Build arguments
 # =============================================================================
 ARG GO_VERSION=1.25
-ARG ALPINE_VERSION=3.23
+ARG UBUNTU_VERSION=3.23
 ARG BUILD_VERSION=dev
 ARG BUILD_DATE=unknown
 ARG GIT_COMMIT=unknown
@@ -16,7 +16,7 @@ ARG GIT_COMMIT=unknown
 # =============================================================================
 # Builder stage
 # =============================================================================
-FROM golang:${GO_VERSION}-alpine${ALPINE_VERSION} AS builder
+FROM golang:${GO_VERSION}-ubuntu${UBUNTU_VERSION} AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -53,7 +53,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # =============================================================================
 # Runtime stage (minimal)
 # =============================================================================
-FROM alpine:${ALPINE_VERSION} AS runtime
+FROM ubuntu:${UBUNTU_VERSION} AS runtime
 
 # Install runtime dependencies
 RUN apk add --no-cache \

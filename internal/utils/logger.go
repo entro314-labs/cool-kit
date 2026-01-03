@@ -102,7 +102,7 @@ func (l *Logger) writeToFile(level, message string) {
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	logLine := fmt.Sprintf("[%s] [%s] %s\n", timestamp, level, message)
-	l.logFile.WriteString(logLine)
+	_, _ = l.logFile.WriteString(logLine)
 }
 
 // Banner displays a banner

@@ -77,7 +77,7 @@ func (d *GitHubDeployer) Deploy() (string, error) {
 	d.sendProgress(totalSteps, totalSteps, "Deployment Complete", 100, "🎉 Coolify deployed from GitHub!", nil)
 	d.sendLog("🎉 Deployment completed successfully!")
 
-	dashboardURL := fmt.Sprintf("http://localhost:8000")
+	dashboardURL := "http://localhost:8000"
 	d.sendLog(fmt.Sprintf("🌐 Dashboard URL: %s", dashboardURL))
 
 	return dashboardURL, nil

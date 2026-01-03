@@ -1,3 +1,4 @@
+// Package azure implements the Azure provider.
 package azure
 
 import (
@@ -359,7 +360,7 @@ func (p *AzureProvider) createVirtualMachine(progressChan chan<- ui.StepProgress
 		progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Creating VM via CLI"}
 
 		cloudInitFile := "/tmp/coolify-cloud-init.yaml"
-		if err := os.WriteFile(cloudInitFile, []byte(cloudInit), 0644); err != nil {
+		if err := os.WriteFile(cloudInitFile, []byte(cloudInit), 0600); err != nil {
 			return ui.NewDeploymentError("azure", "Write cloud-init", err)
 		}
 

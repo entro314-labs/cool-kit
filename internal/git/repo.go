@@ -97,8 +97,14 @@ func CommitVerbose(dir, message string, verbose bool) error {
 	cmd.Dir = dir
 	if verbose {
 		// Stream output with dim styling like deployment logs
-		stdout, _ := cmd.StdoutPipe()
-		stderr, _ := cmd.StderrPipe()
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return err
+		}
 
 		if err := cmd.Start(); err != nil {
 			return err
@@ -185,8 +191,14 @@ func PushWithTokenVerbose(dir, remoteName, branch, token string, verbose bool) e
 
 	if verbose {
 		// Stream output with dim styling like deployment logs
-		stdout, _ := cmd.StdoutPipe()
-		stderr, _ := cmd.StderrPipe()
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return err
+		}
 
 		if err := cmd.Start(); err != nil {
 			return err

@@ -1,3 +1,4 @@
+// Package config handles configuration management.
 package config
 
 import (
@@ -148,7 +149,7 @@ func Initialize() error {
 	}
 
 	configDir = filepath.Join(home, ".cool-kit")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -370,18 +371,18 @@ func ValidateConfig() error {
 	switch globalConfig.Provider {
 	case "azure":
 		if globalConfig.Azure.Location == "" {
-			return fmt.Errorf("Azure location is required")
+			return fmt.Errorf("azure location is required")
 		}
 		if globalConfig.Azure.ResourceGroup == "" {
-			return fmt.Errorf("Azure resource group is required")
+			return fmt.Errorf("azure resource group is required")
 		}
 	case "local":
 		if globalConfig.Local.WorkDir == "" {
-			return fmt.Errorf("Local work directory is required")
+			return fmt.Errorf("local work directory is required")
 		}
 	case "production":
 		if globalConfig.Production.Domain == "" {
-			return fmt.Errorf("Production domain is required")
+			return fmt.Errorf("production domain is required")
 		}
 	case "aws":
 		if globalConfig.AWS.Region == "" {
@@ -393,7 +394,7 @@ func ValidateConfig() error {
 		}
 	case "baremetal":
 		if globalConfig.BareMetal.Host == "" {
-			return fmt.Errorf("Bare Metal host is required")
+			return fmt.Errorf("bare Metal host is required")
 		}
 	default:
 		// Not returning error for unknown provider to allow for extensions

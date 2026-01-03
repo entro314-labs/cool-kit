@@ -32,8 +32,14 @@ func Push(opts *PushOptions) error {
 
 	// In verbose mode, stream output with dim styling like deployment logs
 	if opts.Verbose {
-		stdout, _ := cmd.StdoutPipe()
-		stderr, _ := cmd.StderrPipe()
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return fmt.Errorf("failed to get stdout pipe: %w", err)
+		}
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return fmt.Errorf("failed to get stderr pipe: %w", err)
+		}
 
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("docker push failed to start: %w", err)
@@ -91,8 +97,14 @@ func login(registry, username, password string, verbose bool) error {
 
 	// In verbose mode, stream output with dim styling like deployment logs
 	if verbose {
-		stdout, _ := cmd.StdoutPipe()
-		stderr, _ := cmd.StderrPipe()
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return err
+		}
 
 		if err := cmd.Start(); err != nil {
 			return err
