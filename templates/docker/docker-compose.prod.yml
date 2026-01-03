@@ -1,0 +1,113 @@
+services:
+  coolify:
+    image: coollabsio/coolify:latest
+    container_name: coolify-app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_NAME: Coolify
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://${AZURE_IP}
+      APP_KEY: base64:9nfwcdzLMWSejeMnN6z2rT1srA0SjIlt0vWToTA4m+g=
+      DB_CONNECTION: pgsql
+      DB_HOST: coolify-db
+      DB_PORT: 5432
+      DB_DATABASE: coolify
+      DB_USERNAME: coolify
+      DB_PASSWORD: iAZmP3CTLtffzoWgnNNWkQvSo3xhBLkuHIp+pFpi76k=
+      REDIS_HOST: coolify-redis
+      REDIS_PASSWORD: PWfao/Ez8vhMZlIRuNuyxLlGmvPT8eADJMVKPdV5bIc=
+      REDIS_PORT: 6379
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      BROADCAST_DRIVER: pusher
+      PUSHER_APP_ID: "coolify"
+      PUSHER_APP_KEY: "coolify"
+      PUSHER_APP_SECRET: "coolify"
+      PUSHER_HOST: coolify-realtime
+      PUSHER_PORT: 6001
+      PUSHER_SCHEME: http
+    volumes:
+      - coolify-storage:/var/www/html/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      coolify-db:
+        condition: service_healthy
+      coolify-redis:
+        condition: service_healthy
+    networks:
+      - coolify-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  coolify-db:
+    image: postgres:17-alpine
+    container_name: coolify-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: coolify
+      POSTGRES_PASSWORD: iAZmP3CTLtffzoWgnNNWkQvSo3xhBLkuHIp+pFpi76k=
+      POSTGRES_DB: coolify
+    volumes:
+      - coolify-db-data:/var/lib/postgresql/data
+    networks:
+      - coolify-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coolify -d coolify"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  coolify-redis:
+    image: redis:7-alpine
+    container_name: coolify-redis
+    restart: unless-stopped
+    command: redis-server --requirepass PWfao/Ez8vhMZlIRuNuyxLlGmvPT8eADJMVKPdV5bIc= --appendonly yes
+    volumes:
+      - coolify-redis-data:/data
+    networks:
+      - coolify-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  coolify-realtime:
+    image: quay.io/soketi/soketi:1.6-16-alpine
+    container_name: coolify-realtime
+    restart: unless-stopped
+    ports:
+      - "6001:6001"
+    environment:
+      SOKETI_DEBUG: "0"
+      SOKETI_DEFAULT_APP_ID: "coolify"
+      SOKETI_DEFAULT_APP_KEY: "coolify"
+      SOKETI_DEFAULT_APP_SECRET: "coolify"
+    networks:
+      - coolify-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6001/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  coolify-network:
+    driver: bridge
+
+volumes:
+  coolify-storage:
+    driver: local
+  coolify-db-data:
+    driver: local
+  coolify-redis-data:
+    driver: local

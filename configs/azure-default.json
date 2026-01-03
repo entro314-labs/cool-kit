@@ -1,0 +1,37 @@
+{
+  "infrastructure": {
+    "location": "swedencentral",
+    "vm_size": "Standard_B2s",
+    "admin_username": "azureuser",
+    "ssh_public_key_path": "~/.ssh/id_rsa.pub",
+    "image_offer": "0001-com-ubuntu-containers",
+    "image_publisher": "Canonical",
+    "image_sku": "20_04-lts-gen2",
+    "image_version": "latest"
+  },
+  "networking": {
+    "app_port": 80,
+    "ssh_port": 22,
+    "websocket_port": 6001
+  },
+  "coolify": {
+    "default_admin_email": "admin@coolify.local",
+    "default_admin_password": "admin123",
+    "app_url_template": "http://{public_ip}",
+    "pusher_host_template": "{public_ip}",
+    "pusher_port": 6001
+  },
+  "paths": {
+    "remote_base": "/home/azureuser/coolify",
+    "remote_env": "/home/azureuser/coolify/.env",
+    "remote_status": "/home/azureuser/coolify/.upgrade-status",
+    "remote_logs": "/home/azureuser/coolify/logs",
+    "remote_backups": "/home/azureuser/coolify/backups"
+  },
+  "docker": {
+    "registry_url": "ghcr.io",
+    "helper_image": "coollabsio/coolify-helper",
+    "app_image": "coollabsio/coolify",
+    "realtime_image": "coollabsio/coolify-realtime"
+  }
+}

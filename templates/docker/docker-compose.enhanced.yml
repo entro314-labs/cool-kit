@@ -1,0 +1,295 @@
+version: '3.8'
+
+# Enhanced Coolify Docker Compose Configuration
+# Supports dynamic configuration and enhanced health checks
+
+services:
+  # Main Coolify Application
+  coolify:
+    image: ${DOCKER_APP_IMAGE:-coollabsio/coolify:latest}
+    container_name: ${COOLIFY_CONTAINER_NAME:-coolify-app}
+    restart: unless-stopped
+    ports:
+      - "${NETWORK_APP_PORT:-8000}:80"
+      - "${NETWORK_SSL_PORT:-443}:443"
+    environment:
+      # Application Settings
+      APP_NAME: ${COOLIFY_APP_NAME:-Coolify}
+      APP_ENV: ${COOLIFY_APP_ENV:-local}
+      APP_DEBUG: ${COOLIFY_APP_DEBUG:-true}
+      APP_URL: ${COOLIFY_APP_URL:-http://localhost:8000}
+      APP_KEY: ${COOLIFY_APP_KEY:-}
+      APP_ID: ${COOLIFY_APP_ID:-}
+      
+      # Database Configuration
+      DB_CONNECTION: ${COOLIFY_DB_CONNECTION:-pgsql}
+      DB_HOST: ${COOLIFY_DB_HOST:-coolify-db}
+      DB_PORT: ${COOLIFY_DB_PORT:-5432}
+      DB_DATABASE: ${COOLIFY_DB_DATABASE:-coolify}
+      DB_USERNAME: ${COOLIFY_DB_USERNAME:-coolify}
+      DB_PASSWORD: ${COOLIFY_DB_PASSWORD:-}
+      
+      # Redis Configuration
+      REDIS_HOST: ${COOLIFY_REDIS_HOST:-coolify-redis}
+      REDIS_PASSWORD: ${COOLIFY_REDIS_PASSWORD:-}
+      REDIS_PORT: ${COOLIFY_REDIS_PORT:-6379}
+      
+      # Cache & Session
+      CACHE_STORE: ${COOLIFY_CACHE_STORE:-redis}
+      SESSION_DRIVER: ${COOLIFY_SESSION_DRIVER:-redis}
+      QUEUE_CONNECTION: ${COOLIFY_QUEUE_CONNECTION:-redis}
+      
+      # Broadcasting (WebSocket)
+      BROADCAST_DRIVER: ${COOLIFY_BROADCAST_DRIVER:-pusher}
+      PUSHER_APP_ID: ${COOLIFY_PUSHER_APP_ID:-}
+      PUSHER_APP_KEY: ${COOLIFY_PUSHER_APP_KEY:-}
+      PUSHER_APP_SECRET: ${COOLIFY_PUSHER_APP_SECRET:-}
+      PUSHER_HOST: ${COOLIFY_PUSHER_HOST:-coolify-realtime}
+      PUSHER_PORT: ${COOLIFY_PUSHER_PORT:-6001}
+      PUSHER_SCHEME: ${COOLIFY_PUSHER_SCHEME:-http}
+      PUSHER_APP_CLUSTER: ${COOLIFY_PUSHER_APP_CLUSTER:-mt1}
+      PUSHER_BACKEND_HOST: ${COOLIFY_PUSHER_BACKEND_HOST:-localhost}
+      
+      # Admin User
+      ROOT_USERNAME: ${COOLIFY_ROOT_USERNAME:-admin}
+      ROOT_USER_EMAIL: ${COOLIFY_ROOT_USER_EMAIL:-admin@coolify.local}
+      ROOT_USER_PASSWORD: ${COOLIFY_ROOT_USER_PASSWORD:-admin123}
+      
+      # Development/Production Settings
+      AUTOUPDATE: ${COOLIFY_AUTOUPDATE:-false}
+      LOG_LEVEL: ${COOLIFY_LOG_LEVEL:-debug}
+    volumes:
+      - ${COOLIFY_STORAGE_VOLUME:-coolify-storage}:/var/www/html/storage
+      - ${COOLIFY_SSL_VOLUME:-coolify-ssl}:/var/www/html/storage/app/ssl
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      coolify-db:
+        condition: service_healthy
+      coolify-redis:
+        condition: service_healthy
+      coolify-realtime:
+        condition: service_healthy
+    networks:
+      - coolify-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/up"]
+      interval: ${COOLIFY_HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${COOLIFY_HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${COOLIFY_HEALTH_CHECK_RETRIES:-3}
+      start_period: ${COOLIFY_HEALTH_CHECK_START_PERIOD:-60s}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.coolify.rule=Host(`${COOLIFY_HOST:-localhost}`)"
+      - "traefik.http.services.coolify.loadbalancer.server.port=80"
+
+  # PostgreSQL Database
+  coolify-db:
+    image: ${DOCKER_DB_IMAGE:-postgres:15-alpine}
+    container_name: ${COOLIFY_DB_CONTAINER_NAME:-coolify-db}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${COOLIFY_DB_DATABASE:-coolify}
+      POSTGRES_USER: ${COOLIFY_DB_USERNAME:-coolify}
+      POSTGRES_PASSWORD: ${COOLIFY_DB_PASSWORD:-}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - ${COOLIFY_DB_VOLUME:-coolify-db}:/var/lib/postgresql/data
+      - ${COOLIFY_DB_BACKUP_VOLUME:-coolify-db-backups}:/backups
+    networks:
+      - coolify-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${COOLIFY_DB_USERNAME:-coolify} -d ${COOLIFY_DB_DATABASE:-coolify}"]
+      interval: ${COOLIFY_DB_HEALTH_CHECK_INTERVAL:-10s}
+      timeout: ${COOLIFY_DB_HEALTH_CHECK_TIMEOUT:-5s}
+      retries: ${COOLIFY_DB_HEALTH_CHECK_RETRIES:-5}
+      start_period: ${COOLIFY_DB_HEALTH_CHECK_START_PERIOD:-30s}
+    labels:
+      - "backup.enabled=true"
+      - "backup.schedule=0 2 * * *"
+      - "backup.retention=10"
+
+  # Redis Cache
+  coolify-redis:
+    image: ${DOCKER_REDIS_IMAGE:-redis:7-alpine}
+    container_name: ${COOLIFY_REDIS_CONTAINER_NAME:-coolify-redis}
+    restart: unless-stopped
+    command: redis-server --requirepass ${COOLIFY_REDIS_PASSWORD:-}
+    volumes:
+      - ${COOLIFY_REDIS_VOLUME:-coolify-redis}:/data
+    networks:
+      - coolify-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: ${COOLIFY_REDIS_HEALTH_CHECK_INTERVAL:-10s}
+      timeout: ${COOLIFY_REDIS_HEALTH_CHECK_TIMEOUT:-3s}
+      retries: ${COOLIFY_REDIS_HEALTH_CHECK_RETRIES:-5}
+      start_period: ${COOLIFY_REDIS_HEALTH_CHECK_START_PERIOD:-30s}
+    labels:
+      - "monitoring.enabled=true"
+
+  # WebSocket Server (Soketi)
+  coolify-realtime:
+    image: ${DOCKER_REALTIME_IMAGE:-quay.io/soketi/soketi:latest}
+    container_name: ${COOLIFY_REALTIME_CONTAINER_NAME:-coolify-realtime}
+    restart: unless-stopped
+    ports:
+      - "${NETWORK_WEBSOCKET_PORT:-6001}:6001"
+      - "9601:9601"
+    environment:
+      SOKETI_APP_ID: ${COOLIFY_PUSHER_APP_ID:-}
+      SOKETI_APP_KEY: ${COOLIFY_PUSHER_APP_KEY:-}
+      SOKETI_APP_SECRET: ${COOLIFY_PUSHER_APP_SECRET:-}
+      SOKETI_HOST: 0.0.0.0
+      SOKETI_PORT: 6001
+      SOKETI_METRICS_ENABLED: "true"
+      SOKETI_DEBUG: ${COOLIFY_APP_DEBUG:-true}
+      SOKETI_DEFAULT_APP_ID: ${COOLIFY_PUSHER_APP_ID:-}
+      SOKETI_DEFAULT_APP_KEY: ${COOLIFY_PUSHER_APP_KEY:-}
+      SOKETI_DEFAULT_APP_SECRET: ${COOLIFY_PUSHER_APP_SECRET:-}
+    networks:
+      - coolify-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6001"]
+      interval: ${COOLIFY_REALTIME_HEALTH_CHECK_INTERVAL:-10s}
+      timeout: ${COOLIFY_REALTIME_HEALTH_CHECK_TIMEOUT:-5s}
+      retries: ${COOLIFY_REALTIME_HEALTH_CHECK_RETRIES:-3}
+      start_period: ${COOLIFY_REALTIME_HEALTH_CHECK_START_PERIOD:-30s}
+    labels:
+      - "monitoring.enabled=true"
+      - "metrics.enabled=true"
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: ${DOCKER_NGINX_IMAGE:-nginx:alpine}
+    container_name: ${COOLIFY_NGINX_CONTAINER_NAME:-coolify-nginx}
+    restart: unless-stopped
+    ports:
+      - "${NETWORK_NGINX_HTTP_PORT:-80}:80"
+      - "${NETWORK_NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ${COOLIFY_NGINX_CONFIG_VOLUME:-coolify-nginx-config}:/etc/nginx/conf.d
+      - ${COOLIFY_SSL_VOLUME:-coolify-ssl}:/etc/nginx/ssl
+      - ${COOLIFY_NGINX_LOGS_VOLUME:-coolify-nginx-logs}:/var/log/nginx
+    depends_on:
+      - coolify
+    networks:
+      - coolify-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: ${COOLIFY_NGINX_HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${COOLIFY_NGINX_HEALTH_CHECK_TIMEOUT:-5s}
+      retries: ${COOLIFY_NGINX_HEALTH_CHECK_RETRIES:-3}
+    profiles:
+      - production
+      - nginx
+
+  # Monitoring (Optional)
+  prometheus:
+    image: ${DOCKER_PROMETHEUS_IMAGE:-prom/prometheus:latest}
+    container_name: ${COOLIFY_PROMETHEUS_CONTAINER_NAME:-coolify-prometheus}
+    restart: unless-stopped
+    ports:
+      - "${NETWORK_PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ${COOLIFY_PROMETHEUS_CONFIG_VOLUME:-coolify-prometheus-config}:/etc/prometheus
+      - ${COOLIFY_PROMETHEUS_DATA_VOLUME:-coolify-prometheus-data}:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - coolify-network
+    profiles:
+      - monitoring
+
+  # Grafana Dashboard (Optional)
+  grafana:
+    image: ${DOCKER_GRAFANA_IMAGE:-grafana/grafana:latest}
+    container_name: ${COOLIFY_GRAFANA_CONTAINER_NAME:-coolify-grafana}
+    restart: unless-stopped
+    ports:
+      - "${NETWORK_GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${COOLIFY_GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - ${COOLIFY_GRAFANA_DATA_VOLUME:-coolify-grafana-data}:/var/lib/grafana
+      - ${COOLIFY_GRAFANA_CONFIG_VOLUME:-coolify-grafana-config}:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - coolify-network
+    profiles:
+      - monitoring
+
+networks:
+  coolify-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${COOLIFY_NETWORK_SUBNET:-172.20.0.0/16}
+
+volumes:
+  coolify-storage:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${COOLIFY_STORAGE_PATH:-./data/storage}
+  
+  coolify-db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${COOLIFY_DB_PATH:-./data/db}
+  
+  coolify-db-backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${COOLIFY_DB_BACKUP_PATH:-./data/backups}
+  
+  coolify-redis:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${COOLIFY_REDIS_PATH:-./data/redis}
+  
+  coolify-ssl:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${COOLIFY_SSL_PATH:-./data/ssl}
+  
+  coolify-nginx-config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${COOLIFY_NGINX_CONFIG_PATH:-./data/nginx}
+  
+  coolify-nginx-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${COOLIFY_NGINX_LOGS_PATH:-./logs/nginx}
+  
+  coolify-prometheus-config:
+    driver: local
+  
+  coolify-prometheus-data:
+    driver: local
+  
+  coolify-grafana-data:
+    driver: local
+  
+  coolify-grafana-config:
+    driver: local

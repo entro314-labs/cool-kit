@@ -1,0 +1,19 @@
+{
+  "local": {
+    "app_port": 8000,
+    "websocket_port": 6001,
+    "work_dir": "./coolify-local",
+    "debug": true
+  },
+  "docker": {
+    "app_image": "coollabsio/coolify:latest",
+    "db_image": "postgres:15-alpine",
+    "redis_image": "redis:7-alpine",
+    "realtime_image": "quay.io/soketi/soketi:latest"
+  },
+  "git": {
+    "repository": "https://github.com/coollabsio/coolify.git",
+    "branch": "main",
+    "work_dir": "./coolify-source"
+  }
+}

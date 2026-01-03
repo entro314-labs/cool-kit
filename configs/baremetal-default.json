@@ -1,0 +1,47 @@
+{
+  "connection": {
+    "host": "",
+    "port": 22,
+    "user": "root",
+    "ssh_key_path": "~/.ssh/id_rsa",
+    "connection_timeout_seconds": 30,
+    "command_timeout_seconds": 300
+  },
+  "system_requirements": {
+    "min_ram_gb": 4,
+    "min_disk_gb": 20,
+    "supported_distributions": [
+      "ubuntu",
+      "debian",
+      "centos",
+      "rhel",
+      "fedora",
+      "rocky",
+      "almalinux"
+    ]
+  },
+  "coolify": {
+    "default_admin_email": "admin@coolify.local",
+    "app_url_template": "http://{host}",
+    "pusher_host_template": "{host}",
+    "pusher_port": 6001,
+    "app_port": 8000
+  },
+  "paths": {
+    "remote_base": "/data/coolify",
+    "remote_env": "/data/coolify/.env",
+    "remote_backups": "/data/coolify/backups",
+    "remote_logs": "/data/coolify/logs"
+  },
+  "docker": {
+    "registry_url": "ghcr.io",
+    "helper_image": "coollabsio/coolify-helper",
+    "app_image": "coollabsio/coolify",
+    "realtime_image": "coollabsio/coolify-realtime"
+  },
+  "security": {
+    "disable_root_login": false,
+    "configure_firewall": true,
+    "allowed_ports": [22, 80, 443, 8000, 6001]
+  }
+}

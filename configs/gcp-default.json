@@ -1,0 +1,44 @@
+{
+  "infrastructure": {
+    "project": "",
+    "zone": "us-central1-a",
+    "machine_type": "e2-medium",
+    "admin_username": "coolify",
+    "ssh_public_key_path": "~/.ssh/id_rsa.pub",
+    "boot_disk_size_gb": 30,
+    "boot_disk_type": "pd-balanced",
+    "image_family": "ubuntu-2204-lts",
+    "image_project": "ubuntu-os-cloud",
+    "labels": {
+      "application": "coolify",
+      "managed-by": "cool-kit"
+    }
+  },
+  "networking": {
+    "network": "default",
+    "subnetwork": "",
+    "ssh_port": 22,
+    "app_port": 80,
+    "app_ssl_port": 443,
+    "coolify_port": 8000,
+    "websocket_port": 6001,
+    "firewall_rule_name": "coolify-ingress"
+  },
+  "coolify": {
+    "default_admin_email": "admin@coolify.local",
+    "app_url_template": "http://{external_ip}",
+    "pusher_host_template": "{external_ip}",
+    "pusher_port": 6001
+  },
+  "paths": {
+    "remote_base": "/home/coolify/coolify",
+    "remote_env": "/home/coolify/coolify/.env",
+    "remote_backups": "/home/coolify/coolify/backups"
+  },
+  "docker": {
+    "registry_url": "ghcr.io",
+    "helper_image": "coollabsio/coolify-helper",
+    "app_image": "coollabsio/coolify",
+    "realtime_image": "coollabsio/coolify-realtime"
+  }
+}

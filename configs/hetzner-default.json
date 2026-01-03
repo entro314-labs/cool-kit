@@ -1,0 +1,37 @@
+{
+  "token": "",
+  "infrastructure": {
+    "location": "nbg1",
+    "server_type": "cx21",
+    "image": "ubuntu-22.04",
+    "ssh_key_name": "",
+    "labels": {
+      "application": "coolify",
+      "managed-by": "cool-kit"
+    }
+  },
+  "networking": {
+    "ssh_port": 22,
+    "app_port": 80,
+    "app_ssl_port": 443,
+    "coolify_port": 8000,
+    "websocket_port": 6001
+  },
+  "coolify": {
+    "default_admin_email": "admin@coolify.local",
+    "app_url_template": "http://{public_ip}",
+    "pusher_host_template": "{public_ip}",
+    "pusher_port": 6001
+  },
+  "paths": {
+    "remote_base": "/data/coolify",
+    "remote_env": "/data/coolify/.env",
+    "remote_backups": "/data/coolify/backups"
+  },
+  "docker": {
+    "registry_url": "ghcr.io",
+    "helper_image": "coollabsio/coolify-helper",
+    "app_image": "coollabsio/coolify",
+    "realtime_image": "coollabsio/coolify-realtime"
+  }
+}
