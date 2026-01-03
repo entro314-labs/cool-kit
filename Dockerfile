@@ -8,7 +8,7 @@
 # Build arguments
 # =============================================================================
 ARG GO_VERSION=1.25
-ARG ALPINE_VERSION=3.21
+ARG ALPINE_VERSION=3.23
 ARG BUILD_VERSION=dev
 ARG BUILD_DATE=unknown
 ARG GIT_COMMIT=unknown
