@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -37,7 +38,7 @@ func init() {
 func runInstall(cmd *cobra.Command, args []string) error {
 	// Start interactive TUI to select provider
 	model := ui.NewModel() // This model should handle provider selection
-	program := tea.NewProgram(model)
+	program := tea.NewProgram(model, tea.WithContext(cmd.Context()))
 
 	finalModel, err := program.Run()
 	if err != nil {
@@ -47,13 +48,13 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	m := finalModel.(ui.Model)
 
 	if m.Provider != "" {
-		return performInstall(m.Provider)
+		return performInstall(cmd.Context(), m.Provider, m.Configuration)
 	}
 
 	return nil
 }
 
-func performInstall(provider string) error {
+func performInstall(ctx context.Context, provider string, overrides map[string]string) error {
 	cfg := config.Get()
 	if cfg == nil {
 		// Try to init defaults if nil
@@ -63,8 +64,15 @@ func performInstall(provider string) error {
 		cfg = config.Get()
 	}
 
+	// Apply overrides to config if needed
+	if len(overrides) > 0 {
+		if err := cfg.Merge(overrides); err != nil {
+			return fmt.Errorf("failed to apply overrides: %w", err)
+		}
+	}
+
 	o := orchestrator.NewOrchestrator(cfg, provider)
-	result, err := o.Deploy()
+	result, err := o.Deploy(ctx)
 	if err != nil {
 		// Don't wrap the error again - TUI already showed it
 		return err
@@ -81,7 +89,7 @@ var installAzureCmd = &cobra.Command{
 	Short:        "Install on Azure",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return performInstall("azure")
+		return performInstall(cmd.Context(), "azure", nil)
 	},
 }
 
@@ -89,7 +97,7 @@ var installAWSCmd = &cobra.Command{
 	Use:   "aws",
 	Short: "Install on AWS",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return performInstall("aws")
+		return performInstall(cmd.Context(), "aws", nil)
 	},
 }
 
@@ -97,7 +105,7 @@ var installGCPCmd = &cobra.Command{
 	Use:   "gcp",
 	Short: "Install on GCP",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return performInstall("gcp")
+		return performInstall(cmd.Context(), "gcp", nil)
 	},
 }
 
@@ -105,7 +113,7 @@ var installBareMetalCmd = &cobra.Command{
 	Use:   "baremetal",
 	Short: "Install on Bare Metal",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return performInstall("baremetal")
+		return performInstall(cmd.Context(), "baremetal", nil)
 	},
 }
 
@@ -113,6 +121,6 @@ var installLocalCmd = &cobra.Command{
 	Use:   "local",
 	Short: "Install Locally",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return performInstall("local")
+		return performInstall(cmd.Context(), "local", nil)
 	},
 }

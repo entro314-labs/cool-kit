@@ -215,7 +215,7 @@ func (c *Client) AssignFloatingIP(serverID int64) (string, error) {
 	result, _, err := c.hcloud.FloatingIP.Create(c.ctx, hcloud.FloatingIPCreateOpts{
 		Type:        hcloud.FloatingIPTypeIPv4,
 		Server:      &hcloud.Server{ID: serverID},
-		Description: hcloud.Ptr("Coolify static IP"),
+		Description: new("Coolify static IP"),
 		Labels: map[string]string{
 			"application": "coolify",
 			"managed-by":  "cool-kit",

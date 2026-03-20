@@ -86,7 +86,7 @@ func NewGitHubAppService(client *api.Client) *GitHubAppService {
 // List retrieves all GitHub Apps
 func (s *GitHubAppService) List(ctx context.Context) ([]GitHubApp, error) {
 	var apps []GitHubApp
-	err := s.client.Get("github-apps", &apps)
+	err := s.client.Get(ctx, "github-apps", &apps)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list GitHub Apps: %w", err)
 	}
@@ -96,7 +96,7 @@ func (s *GitHubAppService) List(ctx context.Context) ([]GitHubApp, error) {
 // Get retrieves a specific GitHub App by UUID
 func (s *GitHubAppService) Get(ctx context.Context, uuid string) (*GitHubApp, error) {
 	var app GitHubApp
-	err := s.client.Get(fmt.Sprintf("github-apps/%s", uuid), &app)
+	err := s.client.Get(ctx, fmt.Sprintf("github-apps/%s", uuid), &app)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub App %s: %w", uuid, err)
 	}
@@ -106,7 +106,7 @@ func (s *GitHubAppService) Get(ctx context.Context, uuid string) (*GitHubApp, er
 // Create creates a new GitHub App
 func (s *GitHubAppService) Create(ctx context.Context, req *GitHubAppCreateRequest) (*GitHubApp, error) {
 	var app GitHubApp
-	err := s.client.Post("github-apps", req, &app)
+	err := s.client.Post(ctx, "github-apps", req, &app)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitHub App: %w", err)
 	}
@@ -119,7 +119,7 @@ func (s *GitHubAppService) Update(ctx context.Context, uuid string, req *GitHubA
 		Message string `json:"message"`
 	}
 	var resp response
-	err := s.client.Patch(fmt.Sprintf("github-apps/%s", uuid), req, &resp)
+	err := s.client.Patch(ctx, fmt.Sprintf("github-apps/%s", uuid), req, &resp)
 	if err != nil {
 		return fmt.Errorf("failed to update GitHub App %s: %w", uuid, err)
 	}
@@ -128,7 +128,7 @@ func (s *GitHubAppService) Update(ctx context.Context, uuid string, req *GitHubA
 
 // Delete deletes a GitHub App
 func (s *GitHubAppService) Delete(ctx context.Context, uuid string) error {
-	err := s.client.Delete(fmt.Sprintf("github-apps/%s", uuid))
+	err := s.client.Delete(ctx, fmt.Sprintf("github-apps/%s", uuid))
 	if err != nil {
 		return fmt.Errorf("failed to delete GitHub App %s: %w", uuid, err)
 	}
@@ -141,7 +141,7 @@ func (s *GitHubAppService) ListRepositories(ctx context.Context, appUUID string)
 		Repositories []GitHubRepository `json:"repositories"`
 	}
 	var resp response
-	err := s.client.Get(fmt.Sprintf("github-apps/%s/repositories", appUUID), &resp)
+	err := s.client.Get(ctx, fmt.Sprintf("github-apps/%s/repositories", appUUID), &resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list repositories for GitHub App %s: %w", appUUID, err)
 	}
@@ -154,7 +154,7 @@ func (s *GitHubAppService) ListBranches(ctx context.Context, appUUID string, own
 		Branches []GitHubBranch `json:"branches"`
 	}
 	var resp response
-	err := s.client.Get(fmt.Sprintf("github-apps/%s/repositories/%s/%s/branches", appUUID, owner, repo), &resp)
+	err := s.client.Get(ctx, fmt.Sprintf("github-apps/%s/repositories/%s/%s/branches", appUUID, owner, repo), &resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list branches for %s/%s: %w", owner, repo, err)
 	}

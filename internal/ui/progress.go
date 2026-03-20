@@ -301,13 +301,7 @@ func (m ProgressModel) View() string {
 	var b strings.Builder
 
 	// Calculate widths for horizontal layout
-	totalWidth := m.width
-	if totalWidth < 80 {
-		totalWidth = 80
-	}
-	if totalWidth > 120 {
-		totalWidth = 120
-	}
+	totalWidth := min(max(m.width, 80), 120)
 
 	// Header - centered
 	header := progressTitleStyle.Render(
@@ -412,13 +406,7 @@ func (m ProgressModel) renderComplete() string {
 	totalDuration := time.Since(m.startTime).Round(time.Second)
 
 	// Calculate widths
-	totalWidth := m.width
-	if totalWidth < 80 {
-		totalWidth = 80
-	}
-	if totalWidth > 120 {
-		totalWidth = 120
-	}
+	totalWidth := min(max(m.width, 80), 120)
 
 	if m.err != nil {
 		// Error screen - centered banner
@@ -598,8 +586,8 @@ func (m ProgressModel) extractDashboardURL() string {
 		log := m.logs[i]
 		if strings.Contains(log.Message, "http://") || strings.Contains(log.Message, "https://") {
 			// Extract URL
-			parts := strings.Fields(log.Message)
-			for _, part := range parts {
+			parts := strings.FieldsSeq(log.Message)
+			for part := range parts {
 				if strings.HasPrefix(part, "http://") || strings.HasPrefix(part, "https://") {
 					return part
 				}

@@ -429,10 +429,3 @@ func (p *AWSProvider) getAMI() string {
 	// Ubuntu 24.04 LTS in us-east-1 (noble)
 	return "ami-04b70fa74e45c3917"
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

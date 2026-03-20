@@ -2,6 +2,7 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -243,11 +244,11 @@ func (p *DockerProvider) runHealthChecks(progressChan chan<- ui.StepProgressMsg,
 	httpURL := fmt.Sprintf("http://localhost:%d", port)
 	wsURL := fmt.Sprintf("http://localhost:%d", p.config.Local.WebSocketPort)
 
-	if err := p.health.WaitForHTTP(httpURL, 10, 3*time.Second); err != nil {
+	if err := p.health.WaitForHTTP(context.TODO(), httpURL, 10, 3*time.Second); err != nil {
 		return err
 	}
 
-	p.health.CheckWebSocket(wsURL, 5*time.Second)
+	p.health.CheckWebSocket(context.TODO(), wsURL, 5*time.Second)
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Health checks passed"}
 	return nil
@@ -281,11 +282,4 @@ func (p *DockerProvider) getComposeFile() string {
 	default:
 		return "docker-compose.local.yml"
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

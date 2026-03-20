@@ -192,14 +192,14 @@ func Table(headers []string, rows [][]string) {
 	}
 
 	// Build header row
-	headerLine := ""
+	var headerLine strings.Builder
 	for i, h := range headers {
 		if i > 0 {
-			headerLine += "  "
+			headerLine.WriteString("  ")
 		}
-		headerLine += BoldStyle.Render(fmt.Sprintf("%-*s", widths[i], h))
+		headerLine.WriteString(BoldStyle.Render(fmt.Sprintf("%-*s", widths[i], h)))
 	}
-	fmt.Println(headerLine)
+	fmt.Println(headerLine.String())
 
 	// Build separator
 	sepLine := ""
@@ -215,16 +215,16 @@ func Table(headers []string, rows [][]string) {
 
 	// Print rows
 	for _, row := range rows {
-		rowLine := ""
+		var rowLine strings.Builder
 		for i, cell := range row {
 			if i > 0 {
-				rowLine += "  "
+				rowLine.WriteString("  ")
 			}
 			if i < len(widths) {
-				rowLine += fmt.Sprintf("%-*s", widths[i], cell)
+				rowLine.WriteString(fmt.Sprintf("%-*s", widths[i], cell))
 			}
 		}
-		fmt.Println(rowLine)
+		fmt.Println(rowLine.String())
 	}
 }
 
@@ -370,8 +370,8 @@ func NewCmdOutput() *CmdOutput {
 
 func (c *CmdOutput) Write(p []byte) (n int, err error) {
 	if debugMode {
-		lines := strings.Split(string(p), "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(string(p), "\n")
+		for line := range lines {
 			if line != "" {
 				fmt.Println(DimStyle.Render("  " + line))
 			}

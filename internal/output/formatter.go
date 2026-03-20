@@ -16,7 +16,7 @@ const (
 // Formatter is the interface for output formatting
 type Formatter interface {
 	// Format formats the data and writes it to the writer
-	Format(data interface{}) error
+	Format(data any) error
 }
 
 // Options for formatter configuration

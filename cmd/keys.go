@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -27,7 +26,7 @@ var keysListCmd = &cobra.Command{
 		}
 
 		svc := service.NewPrivateKeyService(client)
-		keys, err := svc.List(context.Background())
+		keys, err := svc.List(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -48,7 +47,7 @@ var keysGetCmd = &cobra.Command{
 		}
 
 		svc := service.NewPrivateKeyService(client)
-		key, err := svc.Get(context.Background(), args[0])
+		key, err := svc.Get(cmd.Context(), args[0])
 		if err != nil {
 			return err
 		}
@@ -76,8 +75,8 @@ Use @filename to read the key from a file:
 		keyContent := args[1]
 
 		// Handle @filename syntax
-		if strings.HasPrefix(keyContent, "@") {
-			filename := strings.TrimPrefix(keyContent, "@")
+		if after, ok := strings.CutPrefix(keyContent, "@"); ok {
+			filename := after
 			// Expand ~ to home directory
 			if strings.HasPrefix(filename, "~") {
 				home, err := os.UserHomeDir()
@@ -96,7 +95,7 @@ Use @filename to read the key from a file:
 		description, _ := cmd.Flags().GetString("description")
 
 		svc := service.NewPrivateKeyService(client)
-		key, err := svc.Create(context.Background(), service.PrivateKeyCreateRequest{
+		key, err := svc.Create(cmd.Context(), service.PrivateKeyCreateRequest{
 			Name:        name,
 			Description: description,
 			PrivateKey:  keyContent,
@@ -122,7 +121,7 @@ var keysRemoveCmd = &cobra.Command{
 		}
 
 		svc := service.NewPrivateKeyService(client)
-		if err := svc.Delete(context.Background(), args[0]); err != nil {
+		if err := svc.Delete(cmd.Context(), args[0]); err != nil {
 			return err
 		}
 

@@ -92,7 +92,7 @@ func (c *GitHubClient) DeleteRepo(owner, name string) error {
 	return c.request("DELETE", url, nil, nil)
 }
 
-func (c *GitHubClient) request(method, url string, body interface{}, result interface{}) error {
+func (c *GitHubClient) request(method, url string, body any, result any) error {
 	debug := os.Getenv("CDP_DEBUG") != ""
 	if debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG] GitHub API: %s %s\n", method, url)

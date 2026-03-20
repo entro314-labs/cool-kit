@@ -1,6 +1,7 @@
 package baremetal
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -87,7 +88,7 @@ func (p *BareMetalProvider) validateSSH(progressChan chan<- ui.StepProgressMsg, 
 	host := p.getHost()
 	user := p.getUser()
 
-	if err := p.health.CheckSSH(host, user, 10*time.Second); err != nil {
+	if err := p.health.CheckSSH(context.TODO(), host, user, 10*time.Second); err != nil {
 		return fmt.Errorf("SSH connectivity check failed: %w", err)
 	}
 
@@ -254,7 +255,7 @@ func (p *BareMetalProvider) runHealthChecks(progressChan chan<- ui.StepProgressM
 	httpURL := fmt.Sprintf("http://%s", host)
 	wsURL := fmt.Sprintf("http://%s:6001", host)
 
-	if err := p.health.ComprehensiveCheck(httpURL, wsURL); err != nil {
+	if err := p.health.ComprehensiveCheck(context.TODO(), httpURL, wsURL); err != nil {
 		return fmt.Errorf("health checks failed: %w", err)
 	}
 

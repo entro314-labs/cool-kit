@@ -2,6 +2,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -20,14 +21,19 @@ func NewHealthChecker(logger *Logger) *HealthChecker {
 }
 
 // CheckHTTP checks if an HTTP endpoint is responding
-func (h *HealthChecker) CheckHTTP(url string, timeout time.Duration) error {
+func (h *HealthChecker) CheckHTTP(ctx context.Context, url string, timeout time.Duration) error {
 	h.logger.Debug("Checking HTTP endpoint: %s", url)
 
 	client := &http.Client{
 		Timeout: timeout,
 	}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("HTTP check failed: %w", err)
 	}
@@ -42,7 +48,7 @@ func (h *HealthChecker) CheckHTTP(url string, timeout time.Duration) error {
 }
 
 // CheckWebSocket checks if a WebSocket endpoint is responding
-func (h *HealthChecker) CheckWebSocket(url string, timeout time.Duration) error {
+func (h *HealthChecker) CheckWebSocket(ctx context.Context, url string, timeout time.Duration) error {
 	h.logger.Debug("Checking WebSocket endpoint: %s", url)
 
 	// Simple HTTP check for WebSocket endpoint
@@ -50,7 +56,13 @@ func (h *HealthChecker) CheckWebSocket(url string, timeout time.Duration) error 
 		Timeout: timeout,
 	}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		h.logger.Warning("WebSocket check failed to create request: %v", err)
+		return nil
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		h.logger.Warning("WebSocket check failed (may be expected): %v", err)
 		return nil // Don't fail on WebSocket check
@@ -88,11 +100,17 @@ func (h *HealthChecker) CheckDockerService(composeFile string, minServices int) 
 }
 
 // CheckSSH checks if SSH connection is available
-func (h *HealthChecker) CheckSSH(host, user string, timeout time.Duration) error {
+func (h *HealthChecker) CheckSSH(ctx context.Context, host, user string, timeout time.Duration) error {
 	h.logger.Debug("Checking SSH connectivity to %s@%s", user, host)
 
-	cmd := exec.Command("ssh",
-		"-o", "ConnectTimeout=10",
+	// Create context with timeout if not already set, or rely on passed context
+	// Here we use the passed context for CommandContext. Caller handles timeout via context or args.
+	// But the arguments have timeout. Let's respect the timeout argument by creating a child context.
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "ssh",
+		"-o", "ConnectTimeout=10", // SSH level timeout
 		"-o", "BatchMode=yes",
 		fmt.Sprintf("%s@%s", user, host),
 		"echo 'SSH OK'")
@@ -106,11 +124,11 @@ func (h *HealthChecker) CheckSSH(host, user string, timeout time.Duration) error
 }
 
 // WaitForHTTP waits for an HTTP endpoint to become available
-func (h *HealthChecker) WaitForHTTP(url string, maxRetries int, retryInterval time.Duration) error {
+func (h *HealthChecker) WaitForHTTP(ctx context.Context, url string, maxRetries int, retryInterval time.Duration) error {
 	h.logger.Info("Waiting for HTTP endpoint: %s", url)
 
-	for i := 0; i < maxRetries; i++ {
-		if err := h.CheckHTTP(url, 5*time.Second); err == nil {
+	for i := range maxRetries {
+		if err := h.CheckHTTP(ctx, url, 5*time.Second); err == nil {
 			return nil
 		}
 
@@ -124,17 +142,17 @@ func (h *HealthChecker) WaitForHTTP(url string, maxRetries int, retryInterval ti
 }
 
 // ComprehensiveCheck performs all health checks for a deployment
-func (h *HealthChecker) ComprehensiveCheck(httpURL, wsURL string) error {
+func (h *HealthChecker) ComprehensiveCheck(ctx context.Context, httpURL, wsURL string) error {
 	h.logger.Section("Running Health Checks")
 
 	// Check HTTP
-	if err := h.CheckHTTP(httpURL, 10*time.Second); err != nil {
+	if err := h.CheckHTTP(ctx, httpURL, 10*time.Second); err != nil {
 		h.logger.Error("HTTP health check failed: %v", err)
 		return err
 	}
 
 	// Check WebSocket (non-fatal)
-	h.CheckWebSocket(wsURL, 10*time.Second)
+	h.CheckWebSocket(ctx, wsURL, 10*time.Second)
 
 	h.logger.Success("All health checks passed")
 	return nil

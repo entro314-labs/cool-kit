@@ -254,10 +254,10 @@ func (p *ProductionProvider) configureSSL(progressChan chan<- ui.StepProgressMsg
 	}
 
 	// Coolify handles SSL internally via Traefik/Caddy, but we verify the setup
-	sslCheck := fmt.Sprintf(`
+	sslCheck := `
 # Verify SSL is being handled
 docker ps | grep -E "(traefik|caddy)" && echo "SSL proxy running"
-`)
+`
 
 	args := p.buildSSHArgs(sslCheck)
 	cmd := exec.Command("ssh", args...)
@@ -290,8 +290,8 @@ func (p *ProductionProvider) runHealthChecks(progressChan chan<- ui.StepProgress
 		return fmt.Errorf("failed to check container status: %w", err)
 	}
 
-	containers := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, container := range containers {
+	containers := strings.SplitSeq(strings.TrimSpace(string(output)), "\n")
+	for container := range containers {
 		if container != "" {
 			logChan <- ui.LogMsg{Level: ui.LogInfo, Message: container}
 		}

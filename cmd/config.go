@@ -162,7 +162,7 @@ Examples:
 		}
 
 		// Parse JSON
-		var imported map[string]interface{}
+		var imported map[string]any
 		if err := json.Unmarshal(data, &imported); err != nil {
 			return fmt.Errorf("failed to parse JSON: %w", err)
 		}

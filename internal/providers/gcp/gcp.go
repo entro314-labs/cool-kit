@@ -1,6 +1,7 @@
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -284,7 +285,7 @@ func (p *GCPProvider) runHealthChecks(progressChan chan<- ui.StepProgressMsg, lo
 	httpURL := fmt.Sprintf("http://%s", publicIP)
 	wsURL := fmt.Sprintf("http://%s:6001", publicIP)
 
-	if err := p.health.ComprehensiveCheck(httpURL, wsURL); err != nil {
+	if err := p.health.ComprehensiveCheck(context.TODO(), httpURL, wsURL); err != nil {
 		return err
 	}
 

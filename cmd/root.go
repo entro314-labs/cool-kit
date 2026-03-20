@@ -1,8 +1,8 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
-	"os"
 
 	"github.com/entro314-labs/cool-kit/internal/ui"
 	"github.com/spf13/cobra"
@@ -30,7 +30,8 @@ Features:
   • Production and preview deployments
   • Environment variable management
   • Deployment monitoring and rollbacks`,
-	RunE: runMainTUI,
+	RunE:         runMainTUI,
+	SilenceUsage: true,
 }
 
 // runMainTUI runs the main TUI menu and dispatches to subcommands
@@ -44,7 +45,7 @@ func runMainTUI(cmd *cobra.Command, args []string) error {
 	case ui.SelectionInstall:
 		return runInstall(cmd, args)
 	case ui.SelectionDeploy:
-		return runDeploy()
+		return runDeploy(cmd.Context())
 	case ui.SelectionInit:
 		return runInit(cmd, args)
 	case ui.SelectionLink:
@@ -75,13 +76,10 @@ func runMainTUI(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func Execute(version, commit, date string) {
+func Execute(ctx context.Context, version, commit, date string) error {
 	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date)
 
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	return rootCmd.ExecuteContext(ctx)
 }
 
 func init() {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -37,13 +38,13 @@ Available tools exposed via MCP:
   • get_application       - Get details of a specific application
   • get_application_logs  - Retrieve application logs
   • start_application     - Start an application
-  • stop_application      - Stop an application  
+  • stop_application      - Stop an application
   • restart_application   - Restart an application
   • deploy_application    - Trigger a deployment
   • list_deployments      - List deployments for an application
   • get_deployment        - Get deployment details with logs`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runMCP()
+		return runMCP(cmd.Context())
 	},
 }
 
@@ -51,7 +52,7 @@ func init() {
 	rootCmd.AddCommand(mcpCmd)
 }
 
-func runMCP() error {
+func runMCP(ctx context.Context) error {
 	// Load global config to get Coolify connection
 	globalCfg, err := config.LoadGlobal()
 	if err != nil {
@@ -69,12 +70,12 @@ func runMCP() error {
 	client := api.NewClient(globalCfg.CoolifyURL, globalCfg.CoolifyToken)
 
 	// Verify connection
-	if err := client.HealthCheck(); err != nil {
+	if err := client.HealthCheck(ctx); err != nil {
 		ui.Error(fmt.Sprintf("Failed to connect to Coolify: %v", err))
 		return err
 	}
 
 	// Start MCP server
 	server := mcp.NewMCPServer(client)
-	return server.Start()
+	return server.Start(ctx)
 }

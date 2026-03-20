@@ -131,10 +131,10 @@ func (c *SDKClient) EnsureResourceGroup() error {
 
 	// Create resource group
 	_, err = c.resourcesClient.CreateOrUpdate(c.ctx, c.resourceGroup, armresources.ResourceGroup{
-		Location: to.Ptr(c.location),
+		Location: new(c.location),
 		Tags: map[string]*string{
-			"createdby":   to.Ptr("coolify-cli"),
-			"environment": to.Ptr("production"),
+			"createdby":   new("coolify-cli"),
+			"environment": new("production"),
 		},
 	}, nil)
 
@@ -163,28 +163,28 @@ func (c *SDKClient) EnsureNSG(opts NSGCreateOpts) (string, error) {
 	rules := make([]*armnetwork.SecurityRule, len(opts.Ports))
 	for i, port := range opts.Ports {
 		rules[i] = &armnetwork.SecurityRule{
-			Name: to.Ptr(fmt.Sprintf("Allow%d", port)),
+			Name: new(fmt.Sprintf("Allow%d", port)),
 			Properties: &armnetwork.SecurityRulePropertiesFormat{
-				Priority:                 to.Ptr(int32(100 + i*10)),
+				Priority:                 new(int32(100 + i*10)),
 				Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
 				Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
 				Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
-				SourceAddressPrefix:      to.Ptr("*"),
-				SourcePortRange:          to.Ptr("*"),
-				DestinationAddressPrefix: to.Ptr("*"),
-				DestinationPortRange:     to.Ptr(fmt.Sprintf("%d", port)),
+				SourceAddressPrefix:      new("*"),
+				SourcePortRange:          new("*"),
+				DestinationAddressPrefix: new("*"),
+				DestinationPortRange:     new(fmt.Sprintf("%d", port)),
 			},
 		}
 	}
 
 	poller, err := c.nsgClient.BeginCreateOrUpdate(c.ctx, c.resourceGroup, opts.Name,
 		armnetwork.SecurityGroup{
-			Location: to.Ptr(c.location),
+			Location: new(c.location),
 			Properties: &armnetwork.SecurityGroupPropertiesFormat{
 				SecurityRules: rules,
 			},
 			Tags: map[string]*string{
-				"createdby": to.Ptr("coolify-cli"),
+				"createdby": new("coolify-cli"),
 			},
 		}, nil)
 
@@ -211,22 +211,22 @@ func (c *SDKClient) EnsureVNet(vnetName, subnetName string) (string, error) {
 	// Create VNet with subnet
 	poller, err := c.vnetClient.BeginCreateOrUpdate(c.ctx, c.resourceGroup, vnetName,
 		armnetwork.VirtualNetwork{
-			Location: to.Ptr(c.location),
+			Location: new(c.location),
 			Properties: &armnetwork.VirtualNetworkPropertiesFormat{
 				AddressSpace: &armnetwork.AddressSpace{
-					AddressPrefixes: []*string{to.Ptr("10.0.0.0/16")},
+					AddressPrefixes: []*string{new("10.0.0.0/16")},
 				},
 				Subnets: []*armnetwork.Subnet{
 					{
-						Name: to.Ptr(subnetName),
+						Name: new(subnetName),
 						Properties: &armnetwork.SubnetPropertiesFormat{
-							AddressPrefix: to.Ptr("10.0.0.0/24"),
+							AddressPrefix: new("10.0.0.0/24"),
 						},
 					},
 				},
 			},
 			Tags: map[string]*string{
-				"createdby": to.Ptr("coolify-cli"),
+				"createdby": new("coolify-cli"),
 			},
 		}, nil)
 
@@ -257,7 +257,7 @@ func (c *SDKClient) CreatePublicIP(name string) (string, error) {
 
 	poller, err := c.publicIPClient.BeginCreateOrUpdate(c.ctx, c.resourceGroup, name,
 		armnetwork.PublicIPAddress{
-			Location: to.Ptr(c.location),
+			Location: new(c.location),
 			Properties: &armnetwork.PublicIPAddressPropertiesFormat{
 				PublicIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethodStatic),
 			},
@@ -265,7 +265,7 @@ func (c *SDKClient) CreatePublicIP(name string) (string, error) {
 				Name: to.Ptr(armnetwork.PublicIPAddressSKUNameStandard),
 			},
 			Tags: map[string]*string{
-				"createdby": to.Ptr("coolify-cli"),
+				"createdby": new("coolify-cli"),
 			},
 		}, nil)
 
@@ -291,28 +291,28 @@ func (c *SDKClient) CreateNIC(name, subnetID, publicIPID, nsgID string) (string,
 
 	poller, err := c.networkClient.BeginCreateOrUpdate(c.ctx, c.resourceGroup, name,
 		armnetwork.Interface{
-			Location: to.Ptr(c.location),
+			Location: new(c.location),
 			Properties: &armnetwork.InterfacePropertiesFormat{
 				IPConfigurations: []*armnetwork.InterfaceIPConfiguration{
 					{
-						Name: to.Ptr("ipconfig1"),
+						Name: new("ipconfig1"),
 						Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
 							PrivateIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethodDynamic),
 							Subnet: &armnetwork.Subnet{
-								ID: to.Ptr(subnetID),
+								ID: new(subnetID),
 							},
 							PublicIPAddress: &armnetwork.PublicIPAddress{
-								ID: to.Ptr(publicIPID),
+								ID: new(publicIPID),
 							},
 						},
 					},
 				},
 				NetworkSecurityGroup: &armnetwork.SecurityGroup{
-					ID: to.Ptr(nsgID),
+					ID: new(nsgID),
 				},
 			},
 			Tags: map[string]*string{
-				"createdby": to.Ptr("coolify-cli"),
+				"createdby": new("coolify-cli"),
 			},
 		}, nil)
 
@@ -359,8 +359,8 @@ func (c *SDKClient) CreateVM(opts VMCreateOpts) (*VMInfo, error) {
 	sshConfig := &armcompute.SSHConfiguration{
 		PublicKeys: []*armcompute.SSHPublicKey{
 			{
-				Path:    to.Ptr(fmt.Sprintf("/home/%s/.ssh/authorized_keys", opts.AdminUsername)),
-				KeyData: to.Ptr(opts.SSHPublicKey),
+				Path:    new(fmt.Sprintf("/home/%s/.ssh/authorized_keys", opts.AdminUsername)),
+				KeyData: new(opts.SSHPublicKey),
 			},
 		},
 	}
@@ -373,49 +373,49 @@ func (c *SDKClient) CreateVM(opts VMCreateOpts) (*VMInfo, error) {
 
 	poller, err := c.computeClient.BeginCreateOrUpdate(c.ctx, c.resourceGroup, opts.Name,
 		armcompute.VirtualMachine{
-			Location: to.Ptr(c.location),
+			Location: new(c.location),
 			Properties: &armcompute.VirtualMachineProperties{
 				HardwareProfile: &armcompute.HardwareProfile{
-					VMSize: to.Ptr(armcompute.VirtualMachineSizeTypes(opts.Size)),
+					VMSize: new(armcompute.VirtualMachineSizeTypes(opts.Size)),
 				},
 				StorageProfile: &armcompute.StorageProfile{
 					ImageReference: &armcompute.ImageReference{
-						Publisher: to.Ptr("Canonical"),
-						Offer:     to.Ptr("0001-com-ubuntu-server-jammy"),
-						SKU:       to.Ptr("22_04-lts-gen2"),
-						Version:   to.Ptr("latest"),
+						Publisher: new("Canonical"),
+						Offer:     new("0001-com-ubuntu-server-jammy"),
+						SKU:       new("22_04-lts-gen2"),
+						Version:   new("latest"),
 					},
 					OSDisk: &armcompute.OSDisk{
 						CreateOption: to.Ptr(armcompute.DiskCreateOptionTypesFromImage),
 						ManagedDisk: &armcompute.ManagedDiskParameters{
 							StorageAccountType: to.Ptr(armcompute.StorageAccountTypesStandardLRS),
 						},
-						DiskSizeGB: to.Ptr(int32(30)),
+						DiskSizeGB: new(int32(30)),
 					},
 				},
 				OSProfile: &armcompute.OSProfile{
-					ComputerName:  to.Ptr(opts.Name),
-					AdminUsername: to.Ptr(opts.AdminUsername),
-					CustomData:    to.Ptr(customData),
+					ComputerName:  new(opts.Name),
+					AdminUsername: new(opts.AdminUsername),
+					CustomData:    new(customData),
 					LinuxConfiguration: &armcompute.LinuxConfiguration{
-						DisablePasswordAuthentication: to.Ptr(true),
+						DisablePasswordAuthentication: new(true),
 						SSH:                           sshConfig,
 					},
 				},
 				NetworkProfile: &armcompute.NetworkProfile{
 					NetworkInterfaces: []*armcompute.NetworkInterfaceReference{
 						{
-							ID: to.Ptr(opts.NicID),
+							ID: new(opts.NicID),
 							Properties: &armcompute.NetworkInterfaceReferenceProperties{
-								Primary: to.Ptr(true),
+								Primary: new(true),
 							},
 						},
 					},
 				},
 			},
 			Tags: map[string]*string{
-				"createdby":   to.Ptr("coolify-cli"),
-				"application": to.Ptr("coolify"),
+				"createdby":   new("coolify-cli"),
+				"application": new("coolify"),
 			},
 		}, nil)
 

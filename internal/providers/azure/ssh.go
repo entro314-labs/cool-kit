@@ -49,7 +49,7 @@ func (s *SSHClient) ExecuteWithRetry(command string, maxRetries int, retryDelay 
 	var lastErr error
 	var output string
 
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		output, lastErr = s.Execute(command)
 		if lastErr == nil {
 			return output, nil

@@ -104,8 +104,8 @@ func checkResources() error {
 		return fmt.Errorf("failed to get Docker stats: %w", err)
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(string(output)), "\n")
+	for line := range lines {
 		ui.Dim(fmt.Sprintf("  %s", line))
 	}
 

@@ -2,6 +2,7 @@
 package appdeploy
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,7 +24,7 @@ type SetupResult struct {
 }
 
 // FirstTimeSetup walks the user through initial project configuration.
-func FirstTimeSetup(client *api.Client, globalCfg *config.GlobalConfig) (*SetupResult, error) {
+func FirstTimeSetup(ctx context.Context, client *api.Client, globalCfg *config.GlobalConfig) (*SetupResult, error) {
 	ui.Spacer()
 	ui.StepProgress(1, 6, "Framework Detection")
 
@@ -59,7 +60,7 @@ func FirstTimeSetup(client *api.Client, globalCfg *config.GlobalConfig) (*SetupR
 	ui.Divider()
 	ui.StepProgress(4, 6, "Server Selection")
 
-	serverUUID, err := selectServer(client)
+	serverUUID, err := selectServer(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,7 @@ func FirstTimeSetup(client *api.Client, globalCfg *config.GlobalConfig) (*SetupR
 	ui.Divider()
 	ui.StepProgress(5, 6, "Project Configuration")
 
-	projectName, projectUUID, environmentUUID, err := selectOrCreateProject(client)
+	projectName, projectUUID, environmentUUID, err := selectOrCreateProject(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +290,7 @@ func displayDeployMethod(deployMethod string) {
 	ui.Dim(fmt.Sprintf("→ %s", deployMethodDisplay))
 }
 
-func selectServer(client *api.Client) (string, error) {
+func selectServer(ctx context.Context, client *api.Client) (string, error) {
 	var servers []api.Server
 	err := ui.RunTasks([]ui.Task{
 		{
@@ -298,7 +299,7 @@ func selectServer(client *api.Client) (string, error) {
 			CompleteName: "✓ Loaded servers",
 			Action: func() error {
 				var err error
-				servers, err = client.ListServers()
+				servers, err = client.ListServers(ctx)
 				return err
 			},
 		},
@@ -336,7 +337,7 @@ func selectServer(client *api.Client) (string, error) {
 	return serverUUID, nil
 }
 
-func selectOrCreateProject(client *api.Client) (projectName, projectUUID, environmentUUID string, err error) {
+func selectOrCreateProject(ctx context.Context, client *api.Client) (projectName, projectUUID, environmentUUID string, err error) {
 	var projects []api.Project
 	err = ui.RunTasks([]ui.Task{
 		{
@@ -345,7 +346,7 @@ func selectOrCreateProject(client *api.Client) (projectName, projectUUID, enviro
 			CompleteName: "✓ Loaded projects",
 			Action: func() error {
 				var err error
-				projects, err = client.ListProjects()
+				projects, err = client.ListProjects(ctx)
 				return err
 			},
 		},

@@ -1,6 +1,7 @@
 package smart
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -25,6 +26,8 @@ type ProvisionedService struct {
 	EnvVarName    string
 }
 
+// Structs moved to internal/api/types.go
+
 // ServiceProvisioner handles automatic service creation in Coolify
 type ServiceProvisioner struct {
 	client          *api.Client
@@ -46,7 +49,7 @@ func NewServiceProvisioner(client *api.Client, projectUUID, environmentUUID, ser
 }
 
 // Provision creates all required services for a deployment
-func (sp *ServiceProvisioner) Provision(config *DeploymentConfig) (*ProvisioningResult, error) {
+func (sp *ServiceProvisioner) Provision(ctx context.Context, config *DeploymentConfig) (*ProvisioningResult, error) {
 	result := &ProvisioningResult{
 		Services:        []ProvisionedService{},
 		EnvironmentVars: make(map[string]string),
@@ -55,7 +58,7 @@ func (sp *ServiceProvisioner) Provision(config *DeploymentConfig) (*Provisioning
 
 	// Provision each required service
 	for _, service := range config.Services {
-		provisioned, err := sp.provisionService(service)
+		provisioned, err := sp.provisionService(ctx, service)
 		if err != nil {
 			if service.Required {
 				return nil, fmt.Errorf("failed to provision required service %s: %w", service.Type, err)
@@ -82,27 +85,27 @@ func (sp *ServiceProvisioner) Provision(config *DeploymentConfig) (*Provisioning
 }
 
 // provisionService creates a single service in Coolify
-func (sp *ServiceProvisioner) provisionService(service RequiredService) (*ProvisionedService, error) {
+func (sp *ServiceProvisioner) provisionService(ctx context.Context, service RequiredService) (*ProvisionedService, error) {
 	switch service.Type {
 	case "postgresql":
-		return sp.provisionPostgreSQL(service)
+		return sp.provisionPostgreSQL(ctx, service)
 	case "mysql":
-		return sp.provisionMySQL(service)
+		return sp.provisionMySQL(ctx, service)
 	case "mongodb":
-		return sp.provisionMongoDB(service)
+		return sp.provisionMongoDB(ctx, service)
 	case "redis":
-		return sp.provisionRedis(service)
+		return sp.provisionRedis(ctx, service)
 	case "meilisearch":
-		return sp.provisionMeilisearch(service)
+		return sp.provisionMeilisearch(ctx, service)
 	case "elasticsearch":
-		return sp.provisionElasticsearch(service)
+		return sp.provisionElasticsearch(ctx, service)
 	default:
 		return nil, fmt.Errorf("unsupported service type: %s", service.Type)
 	}
 }
 
 // provisionPostgreSQL creates a PostgreSQL database
-func (sp *ServiceProvisioner) provisionPostgreSQL(service RequiredService) (*ProvisionedService, error) {
+func (sp *ServiceProvisioner) provisionPostgreSQL(ctx context.Context, service RequiredService) (*ProvisionedService, error) {
 	name := sp.generateServiceName("postgres")
 
 	password, err := sp.generatePassword()
@@ -111,37 +114,36 @@ func (sp *ServiceProvisioner) provisionPostgreSQL(service RequiredService) (*Pro
 	}
 
 	// Create PostgreSQL database via Coolify API
-	dbConfig := map[string]interface{}{
-		"name":              name,
-		"description":       fmt.Sprintf("PostgreSQL database for %s (%s)", sp.appName, service.Reason),
-		"project_uuid":      sp.projectUUID,
-		"environment_name":  sp.environmentUUID,
-		"server_uuid":       sp.serverUUID,
-		"type":              "postgresql",
-		"image":             fmt.Sprintf("postgres:%s", service.Version),
-		"postgres_db":       sp.sanitizeDBName(sp.appName),
-		"postgres_user":     sp.sanitizeDBName(sp.appName),
-		"postgres_password": password,
-		"is_public":         false,
+	dbConfig := api.PostgresConfig{
+		BaseConfig: api.BaseConfig{
+			Name:            name,
+			Description:     fmt.Sprintf("PostgreSQL database for %s (%s)", sp.appName, service.Reason),
+			ProjectUUID:     sp.projectUUID,
+			EnvironmentName: sp.environmentUUID,
+			ServerUUID:      sp.serverUUID,
+			Type:            "postgresql",
+			Image:           fmt.Sprintf("postgres:%s", service.Version),
+			IsPublic:        false,
+		},
+		PostgresDB:       sp.sanitizeDBName(sp.appName),
+		PostgresUser:     sp.sanitizeDBName(sp.appName),
+		PostgresPassword: password,
 	}
 
-	response, err := sp.client.CreateDatabase(dbConfig)
+	response, err := sp.client.CreateDatabase(ctx, dbConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PostgreSQL database: %w", err)
 	}
 
-	uuid, ok := response["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid response from Coolify API: missing uuid")
-	}
+	uuid := response.UUID
 
 	// Generate connection URL
 	connectionURL := fmt.Sprintf(
 		"postgresql://%s:%s@%s:5432/%s",
-		dbConfig["postgres_user"],
-		dbConfig["postgres_password"],
+		dbConfig.PostgresUser,
+		dbConfig.PostgresPassword,
 		name,
-		dbConfig["postgres_db"],
+		dbConfig.PostgresDB,
 	)
 
 	return &ProvisionedService{
@@ -154,7 +156,7 @@ func (sp *ServiceProvisioner) provisionPostgreSQL(service RequiredService) (*Pro
 }
 
 // provisionMySQL creates a MySQL database
-func (sp *ServiceProvisioner) provisionMySQL(service RequiredService) (*ProvisionedService, error) {
+func (sp *ServiceProvisioner) provisionMySQL(ctx context.Context, service RequiredService) (*ProvisionedService, error) {
 	name := sp.generateServiceName("mysql")
 
 	password, err := sp.generatePassword()
@@ -166,37 +168,36 @@ func (sp *ServiceProvisioner) provisionMySQL(service RequiredService) (*Provisio
 		return nil, fmt.Errorf("failed to generate root password: %w", err)
 	}
 
-	dbConfig := map[string]interface{}{
-		"name":                name,
-		"description":         fmt.Sprintf("MySQL database for %s (%s)", sp.appName, service.Reason),
-		"project_uuid":        sp.projectUUID,
-		"environment_name":    sp.environmentUUID,
-		"server_uuid":         sp.serverUUID,
-		"type":                "mysql",
-		"image":               fmt.Sprintf("mysql:%s", service.Version),
-		"mysql_database":      sp.sanitizeDBName(sp.appName),
-		"mysql_user":          sp.sanitizeDBName(sp.appName),
-		"mysql_password":      password,
-		"mysql_root_password": rootPassword,
-		"is_public":           false,
+	dbConfig := api.MySQLConfig{
+		BaseConfig: api.BaseConfig{
+			Name:            name,
+			Description:     fmt.Sprintf("MySQL database for %s (%s)", sp.appName, service.Reason),
+			ProjectUUID:     sp.projectUUID,
+			EnvironmentName: sp.environmentUUID,
+			ServerUUID:      sp.serverUUID,
+			Type:            "mysql",
+			Image:           fmt.Sprintf("mysql:%s", service.Version),
+			IsPublic:        false,
+		},
+		MySQLDatabase:     sp.sanitizeDBName(sp.appName),
+		MySQLUser:         sp.sanitizeDBName(sp.appName),
+		MySQLPassword:     password,
+		MySQLRootPassword: rootPassword,
 	}
 
-	response, err := sp.client.CreateDatabase(dbConfig)
+	response, err := sp.client.CreateDatabase(ctx, dbConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MySQL database: %w", err)
 	}
 
-	uuid, ok := response["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid response from Coolify API: missing uuid")
-	}
+	uuid := response.UUID
 
 	connectionURL := fmt.Sprintf(
 		"mysql://%s:%s@%s:3306/%s",
-		dbConfig["mysql_user"],
-		dbConfig["mysql_password"],
+		dbConfig.MySQLUser,
+		dbConfig.MySQLPassword,
 		name,
-		dbConfig["mysql_database"],
+		dbConfig.MySQLDatabase,
 	)
 
 	return &ProvisionedService{
@@ -209,7 +210,7 @@ func (sp *ServiceProvisioner) provisionMySQL(service RequiredService) (*Provisio
 }
 
 // provisionMongoDB creates a MongoDB database
-func (sp *ServiceProvisioner) provisionMongoDB(service RequiredService) (*ProvisionedService, error) {
+func (sp *ServiceProvisioner) provisionMongoDB(ctx context.Context, service RequiredService) (*ProvisionedService, error) {
 	name := sp.generateServiceName("mongodb")
 
 	password, err := sp.generatePassword()
@@ -217,33 +218,32 @@ func (sp *ServiceProvisioner) provisionMongoDB(service RequiredService) (*Provis
 		return nil, fmt.Errorf("failed to generate password: %w", err)
 	}
 
-	dbConfig := map[string]interface{}{
-		"name":                       name,
-		"description":                fmt.Sprintf("MongoDB database for %s (%s)", sp.appName, service.Reason),
-		"project_uuid":               sp.projectUUID,
-		"environment_name":           sp.environmentUUID,
-		"server_uuid":                sp.serverUUID,
-		"type":                       "mongodb",
-		"image":                      fmt.Sprintf("mongo:%s", service.Version),
-		"mongo_initdb_root_username": sp.sanitizeDBName(sp.appName),
-		"mongo_initdb_root_password": password,
-		"is_public":                  false,
+	dbConfig := api.MongoDBConfig{
+		BaseConfig: api.BaseConfig{
+			Name:            name,
+			Description:     fmt.Sprintf("MongoDB database for %s (%s)", sp.appName, service.Reason),
+			ProjectUUID:     sp.projectUUID,
+			EnvironmentName: sp.environmentUUID,
+			ServerUUID:      sp.serverUUID,
+			Type:            "mongodb",
+			Image:           fmt.Sprintf("mongo:%s", service.Version),
+			IsPublic:        false,
+		},
+		MongoRootUser:     sp.sanitizeDBName(sp.appName),
+		MongoRootPassword: password,
 	}
 
-	response, err := sp.client.CreateDatabase(dbConfig)
+	response, err := sp.client.CreateDatabase(ctx, dbConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MongoDB database: %w", err)
 	}
 
-	uuid, ok := response["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid response from Coolify API: missing uuid")
-	}
+	uuid := response.UUID
 
 	connectionURL := fmt.Sprintf(
 		"mongodb://%s:%s@%s:27017",
-		dbConfig["mongo_initdb_root_username"],
-		dbConfig["mongo_initdb_root_password"],
+		dbConfig.MongoRootUser,
+		dbConfig.MongoRootPassword,
 		name,
 	)
 
@@ -257,7 +257,7 @@ func (sp *ServiceProvisioner) provisionMongoDB(service RequiredService) (*Provis
 }
 
 // provisionRedis creates a Redis instance
-func (sp *ServiceProvisioner) provisionRedis(service RequiredService) (*ProvisionedService, error) {
+func (sp *ServiceProvisioner) provisionRedis(ctx context.Context, service RequiredService) (*ProvisionedService, error) {
 	name := sp.generateServiceName("redis")
 
 	password, err := sp.generatePassword()
@@ -265,31 +265,30 @@ func (sp *ServiceProvisioner) provisionRedis(service RequiredService) (*Provisio
 		return nil, fmt.Errorf("failed to generate password: %w", err)
 	}
 
-	dbConfig := map[string]interface{}{
-		"name":             name,
-		"description":      fmt.Sprintf("Redis for %s (%s)", sp.appName, service.Reason),
-		"project_uuid":     sp.projectUUID,
-		"environment_name": sp.environmentUUID,
-		"server_uuid":      sp.serverUUID,
-		"type":             "redis",
-		"image":            fmt.Sprintf("redis:%s", service.Version),
-		"redis_password":   password,
-		"is_public":        false,
+	dbConfig := api.RedisConfig{
+		BaseConfig: api.BaseConfig{
+			Name:            name,
+			Description:     fmt.Sprintf("Redis for %s (%s)", sp.appName, service.Reason),
+			ProjectUUID:     sp.projectUUID,
+			EnvironmentName: sp.environmentUUID,
+			ServerUUID:      sp.serverUUID,
+			Type:            "redis",
+			Image:           fmt.Sprintf("redis:%s", service.Version),
+			IsPublic:        false,
+		},
+		RedisPassword: password,
 	}
 
-	response, err := sp.client.CreateDatabase(dbConfig)
+	response, err := sp.client.CreateDatabase(ctx, dbConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Redis instance: %w", err)
 	}
 
-	uuid, ok := response["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid response from Coolify API: missing uuid")
-	}
+	uuid := response.UUID
 
 	connectionURL := fmt.Sprintf(
 		"redis://:%s@%s:6379",
-		dbConfig["redis_password"],
+		dbConfig.RedisPassword,
 		name,
 	)
 
@@ -303,7 +302,7 @@ func (sp *ServiceProvisioner) provisionRedis(service RequiredService) (*Provisio
 }
 
 // provisionMeilisearch creates a Meilisearch instance
-func (sp *ServiceProvisioner) provisionMeilisearch(service RequiredService) (*ProvisionedService, error) {
+func (sp *ServiceProvisioner) provisionMeilisearch(ctx context.Context, service RequiredService) (*ProvisionedService, error) {
 	name := sp.generateServiceName("meilisearch")
 	masterKey, err := sp.generatePassword()
 	if err != nil {
@@ -311,30 +310,29 @@ func (sp *ServiceProvisioner) provisionMeilisearch(service RequiredService) (*Pr
 	}
 
 	// Meilisearch is typically deployed as a service, not a database
-	serviceConfig := map[string]interface{}{
-		"name":             name,
-		"description":      fmt.Sprintf("Meilisearch for %s (%s)", sp.appName, service.Reason),
-		"project_uuid":     sp.projectUUID,
-		"environment_name": sp.environmentUUID,
-		"server_uuid":      sp.serverUUID,
-		"type":             "meilisearch",
-		"image":            "getmeili/meilisearch:latest",
-		"environment_variables": map[string]string{
+	serviceConfig := api.ServiceConfig{
+		BaseConfig: api.BaseConfig{
+			Name:            name,
+			Description:     fmt.Sprintf("Meilisearch for %s (%s)", sp.appName, service.Reason),
+			ProjectUUID:     sp.projectUUID,
+			EnvironmentName: sp.environmentUUID,
+			ServerUUID:      sp.serverUUID,
+			Type:            "meilisearch",
+			Image:           "getmeili/meilisearch:latest",
+			IsPublic:        false,
+		},
+		EnvironmentVariables: map[string]string{
 			"MEILI_MASTER_KEY": masterKey,
 			"MEILI_ENV":        "production",
 		},
-		"is_public": false,
 	}
 
-	response, err := sp.client.CreateService(serviceConfig)
+	response, err := sp.client.CreateService(ctx, serviceConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Meilisearch service: %w", err)
 	}
 
-	uuid, ok := response["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid response from Coolify API: missing uuid")
-	}
+	uuid := response.UUID
 
 	connectionURL := fmt.Sprintf("http://%s:7700", name)
 
@@ -348,38 +346,37 @@ func (sp *ServiceProvisioner) provisionMeilisearch(service RequiredService) (*Pr
 }
 
 // provisionElasticsearch creates an Elasticsearch instance
-func (sp *ServiceProvisioner) provisionElasticsearch(service RequiredService) (*ProvisionedService, error) {
+func (sp *ServiceProvisioner) provisionElasticsearch(ctx context.Context, service RequiredService) (*ProvisionedService, error) {
 	name := sp.generateServiceName("elasticsearch")
 	password, err := sp.generatePassword()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate password: %w", err)
 	}
 
-	serviceConfig := map[string]interface{}{
-		"name":             name,
-		"description":      fmt.Sprintf("Elasticsearch for %s (%s)", sp.appName, service.Reason),
-		"project_uuid":     sp.projectUUID,
-		"environment_name": sp.environmentUUID,
-		"server_uuid":      sp.serverUUID,
-		"type":             "elasticsearch",
-		"image":            fmt.Sprintf("elasticsearch:%s", service.Version),
-		"environment_variables": map[string]string{
+	serviceConfig := api.ServiceConfig{
+		BaseConfig: api.BaseConfig{
+			Name:            name,
+			Description:     fmt.Sprintf("Elasticsearch for %s (%s)", sp.appName, service.Reason),
+			ProjectUUID:     sp.projectUUID,
+			EnvironmentName: sp.environmentUUID,
+			ServerUUID:      sp.serverUUID,
+			Type:            "elasticsearch",
+			Image:           fmt.Sprintf("elasticsearch:%s", service.Version),
+			IsPublic:        false,
+		},
+		EnvironmentVariables: map[string]string{
 			"discovery.type":         "single-node",
 			"ELASTIC_PASSWORD":       password,
 			"xpack.security.enabled": "true",
 		},
-		"is_public": false,
 	}
 
-	response, err := sp.client.CreateService(serviceConfig)
+	response, err := sp.client.CreateService(ctx, serviceConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Elasticsearch service: %w", err)
 	}
 
-	uuid, ok := response["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid response from Coolify API: missing uuid")
-	}
+	uuid := response.UUID
 
 	connectionURL := fmt.Sprintf("https://elastic:%s@%s:9200", password, name)
 

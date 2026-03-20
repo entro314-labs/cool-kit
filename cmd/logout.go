@@ -21,7 +21,7 @@ func runLogout(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !confirm {
-		ui.Dim("Cancelled")
+		ui.Dim("Canceled")
 		return nil
 	}
 

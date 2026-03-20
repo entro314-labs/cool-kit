@@ -121,7 +121,7 @@ const (
 )
 
 // doRequest performs an HTTP request with context support (CAGC pattern)
-func (c *Client) doRequest(ctx context.Context, method, path string, body interface{}, v interface{}) error {
+func (c *Client) doRequest(ctx context.Context, method, path string, body any, v any) error {
 	u, err := c.BaseURL.Parse(path)
 	if err != nil {
 		return err
@@ -139,7 +139,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 }
 
 // doWithRetry executes request with exponential backoff
-func (c *Client) doWithRetry(ctx context.Context, method, urlStr string, body []byte, v interface{}) error {
+func (c *Client) doWithRetry(ctx context.Context, method, urlStr string, body []byte, v any) error {
 	var lastErr error
 	delay := MinRetryDelay
 
@@ -183,9 +183,13 @@ func (c *Client) doWithRetry(ctx context.Context, method, urlStr string, body []
 			continue // Network error, retry
 		}
 
-		// Don't retry on client errors (4xx) except maybe 429?
-		// For now simple logic: if 5xx retry, else return
-		if resp.StatusCode >= 500 {
+		// Retry on specific server errors or rate limiting
+		if resp.StatusCode == http.StatusTooManyRequests ||
+			resp.StatusCode == http.StatusInternalServerError ||
+			resp.StatusCode == http.StatusBadGateway ||
+			resp.StatusCode == http.StatusServiceUnavailable ||
+			resp.StatusCode == http.StatusGatewayTimeout {
+
 			resp.Body.Close()
 			lastErr = fmt.Errorf("server error: %d", resp.StatusCode)
 			continue
@@ -219,50 +223,28 @@ func (c *Client) doWithRetry(ctx context.Context, method, urlStr string, body []
 // Convenience methods that use context.Background() internally.
 // For cancellation support and timeouts, use the context-based methods below directly.
 
-// Get performs a GET request
-func (c *Client) Get(path string, result interface{}) error {
-	return c.doRequest(context.Background(), http.MethodGet, path, nil, result)
-}
-
-// Post performs a POST request
-func (c *Client) Post(path string, body interface{}, result interface{}) error {
-	return c.doRequest(context.Background(), http.MethodPost, path, body, result)
-}
-
-// Patch performs a PATCH request
-func (c *Client) Patch(path string, body interface{}, result interface{}) error {
-	return c.doRequest(context.Background(), http.MethodPatch, path, body, result)
-}
-
-// Delete performs a DELETE request
-func (c *Client) Delete(path string) error {
-	return c.doRequest(context.Background(), http.MethodDelete, path, nil, nil)
-}
-
-// Context-based methods for explicit cancellation and timeout control
-
-// GetWithContext performs a GET request with context
-func (c *Client) GetWithContext(ctx context.Context, path string, result interface{}) error {
+// Get performs a GET request with context
+func (c *Client) Get(ctx context.Context, path string, result any) error {
 	return c.doRequest(ctx, http.MethodGet, path, nil, result)
 }
 
-// PostWithContext performs a POST request with context
-func (c *Client) PostWithContext(ctx context.Context, path string, body interface{}, result interface{}) error {
+// Post performs a POST request with context
+func (c *Client) Post(ctx context.Context, path string, body any, result any) error {
 	return c.doRequest(ctx, http.MethodPost, path, body, result)
 }
 
-// PatchWithContext performs a PATCH request with context
-func (c *Client) PatchWithContext(ctx context.Context, path string, body interface{}, result interface{}) error {
+// Patch performs a PATCH request with context
+func (c *Client) Patch(ctx context.Context, path string, body any, result any) error {
 	return c.doRequest(ctx, http.MethodPatch, path, body, result)
 }
 
-// DeleteWithContext performs a DELETE request with context
-func (c *Client) DeleteWithContext(ctx context.Context, path string) error {
+// Delete performs a DELETE request with context
+func (c *Client) Delete(ctx context.Context, path string) error {
 	return c.doRequest(ctx, http.MethodDelete, path, nil, nil)
 }
 
-// GetWithParams performs a GET request with query parameters
-func (c *Client) GetWithParams(path string, params map[string]string, result interface{}) error {
+// GetWithParams performs a GET request with query parameters and context
+func (c *Client) GetWithParams(ctx context.Context, path string, params map[string]string, result any) error {
 	if len(params) > 0 {
 		values := url.Values{}
 		for k, v := range params {
@@ -270,5 +252,5 @@ func (c *Client) GetWithParams(path string, params map[string]string, result int
 		}
 		path = path + "?" + values.Encode()
 	}
-	return c.Get(path, result)
+	return c.Get(ctx, path, result)
 }

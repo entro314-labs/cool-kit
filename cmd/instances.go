@@ -160,7 +160,7 @@ func runInstancesAdd(cmd *cobra.Command, args []string) error {
 	ui.Spacer()
 	ui.Info("Validating credentials...")
 	client := api.NewClient(url, token)
-	if err := client.HealthCheck(); err != nil {
+	if err := client.HealthCheck(cmd.Context()); err != nil {
 		ui.Error("Connection failed")
 		return fmt.Errorf("failed to connect: %w", err)
 	}
@@ -191,7 +191,7 @@ func runInstancesRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if !confirmed {
-		ui.Dim("Cancelled")
+		ui.Dim("Canceled")
 		return nil
 	}
 

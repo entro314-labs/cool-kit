@@ -27,7 +27,7 @@ func NewOrchestrator(cfg *config.Config, provider string) *Orchestrator {
 }
 
 // Deploy performs the complete deployment with progress tracking
-func (o *Orchestrator) Deploy() (*service.DeploymentResult, error) {
+func (o *Orchestrator) Deploy(ctx context.Context) (*service.DeploymentResult, error) {
 	// Get deployment steps based on provider
 	steps := o.deploymentService.GetDeploymentSteps(o.provider)
 
@@ -42,7 +42,7 @@ func (o *Orchestrator) Deploy() (*service.DeploymentResult, error) {
 
 	// Start deployment in background
 	go func() {
-		result, err := o.deploymentService.Deploy(context.Background(), o.provider, progressChan, logChan)
+		result, err := o.deploymentService.Deploy(ctx, o.provider, progressChan, logChan)
 		if err != nil {
 			errChan <- err
 			return
@@ -51,7 +51,7 @@ func (o *Orchestrator) Deploy() (*service.DeploymentResult, error) {
 	}()
 
 	// Start TUI
-	program := tea.NewProgram(progressModel)
+	program := tea.NewProgram(progressModel, tea.WithContext(ctx))
 
 	// Forward messages from deployment to TUI
 	go func() {

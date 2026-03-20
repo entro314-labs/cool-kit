@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time" // Added for time.Now()
 
 	"github.com/spf13/viper"
@@ -15,21 +16,21 @@ import (
 // Config holds all CLI configuration
 type Config struct {
 	// Multi-instance configuration
-	Instances           []Instance `json:"instances"`
-	CurrentContext      string     `json:"current_context"`
-	LastUpdateCheckTime string     `json:"lastUpdateCheckTime"`
+	Instances           []Instance `json:"instances" mapstructure:"instances"`
+	CurrentContext      string     `json:"current_context" mapstructure:"current_context"`
+	LastUpdateCheckTime string     `json:"lastUpdateCheckTime" mapstructure:"lastUpdateCheckTime"`
 
 	// Legacy/Single-instance configuration (kept for backward compatibility)
-	Provider    string                 `json:"provider"`
-	Environment string                 `json:"environment"`
-	Settings    map[string]interface{} `json:"settings"`
-	Git         GitConfig              `json:"git"`
-	Azure       AzureConfig            `json:"azure,omitempty"`
-	AWS         AWSConfig              `json:"aws,omitempty"`
-	GCP         GCPConfig              `json:"gcp,omitempty"`
-	BareMetal   BareMetalConfig        `json:"baremetal,omitempty"`
-	Local       LocalConfig            `json:"local,omitempty"`
-	Production  ProductionConfig       `json:"production,omitempty"`
+	Provider    string           `json:"provider" mapstructure:"provider"`
+	Environment string           `json:"environment" mapstructure:"environment"`
+	Settings    map[string]any   `json:"settings" mapstructure:"settings"`
+	Git         GitConfig        `json:"git" mapstructure:"git"`
+	Azure       AzureConfig      `json:"azure,omitzero" mapstructure:"azure"`
+	AWS         AWSConfig        `json:"aws,omitzero" mapstructure:"aws"`
+	GCP         GCPConfig        `json:"gcp,omitzero" mapstructure:"gcp"`
+	BareMetal   BareMetalConfig  `json:"baremetal,omitzero" mapstructure:"baremetal"`
+	Local       LocalConfig      `json:"local,omitzero" mapstructure:"local"`
+	Production  ProductionConfig `json:"production,omitzero" mapstructure:"production"`
 
 	path string // config file path (not serialized)
 }
@@ -39,7 +40,7 @@ func New() *Config {
 	return &Config{
 		Instances:           []Instance{},
 		LastUpdateCheckTime: time.Now().Format(time.RFC3339),
-		Settings:            make(map[string]interface{}),
+		Settings:            make(map[string]any),
 		Environment:         "production",
 		path:                Path(),
 	}
@@ -47,10 +48,10 @@ func New() *Config {
 
 // Instance represents a single Coolify instance
 type Instance struct {
-	Name    string `json:"name"`
-	FQDN    string `json:"fqdn"`
-	Token   string `json:"token"`
-	Default bool   `json:"default"`
+	Name    string `json:"name" mapstructure:"name"`
+	FQDN    string `json:"fqdn" mapstructure:"fqdn"`
+	Token   string `json:"token" mapstructure:"token"`
+	Default bool   `json:"default,omitzero" mapstructure:"default"`
 }
 
 // Validate validates the instance configuration
@@ -69,9 +70,9 @@ func (i *Instance) Validate() error {
 
 // GitConfig represents Git-related configuration
 type GitConfig struct {
-	Repository string `json:"repository"`
-	Branch     string `json:"branch"`
-	WorkDir    string `json:"work_dir"`
+	Repository string `json:"repository" mapstructure:"repository"`
+	Branch     string `json:"branch" mapstructure:"branch"`
+	WorkDir    string `json:"work_dir" mapstructure:"work_dir"`
 }
 
 // AzureConfig represents Azure-specific configuration
@@ -87,46 +88,46 @@ type AzureConfig struct {
 
 // LocalConfig represents local development configuration
 type LocalConfig struct {
-	AppPort       int    `json:"app_port"`
-	WebSocketPort int    `json:"websocket_port"`
-	WorkDir       string `json:"work_dir"`
-	Debug         bool   `json:"debug"`
+	AppPort       int    `json:"app_port" mapstructure:"app_port"`
+	WebSocketPort int    `json:"websocket_port" mapstructure:"websocket_port"`
+	WorkDir       string `json:"work_dir" mapstructure:"work_dir"`
+	Debug         bool   `json:"debug,omitzero" mapstructure:"debug"`
 }
 
 // ProductionConfig represents production configuration
 type ProductionConfig struct {
-	Domain     string `json:"domain"`
-	SSLEmail   string `json:"ssl_email"`
-	Kubeconfig string `json:"kubeconfig"`
-	Namespace  string `json:"namespace"`
+	Domain     string `json:"domain" mapstructure:"domain"`
+	SSLEmail   string `json:"ssl_email" mapstructure:"ssl_email"`
+	Kubeconfig string `json:"kubeconfig" mapstructure:"kubeconfig"`
+	Namespace  string `json:"namespace" mapstructure:"namespace"`
 }
 
 // AWSConfig represents AWS-specific configuration
 type AWSConfig struct {
-	Region       string `json:"region"`
-	InstanceType string `json:"instance_type"`
-	AMI          string `json:"ami"`
-	KeyName      string `json:"key_name"`
-	VpcID        string `json:"vpc_id"`
-	SubnetID     string `json:"subnet_id"`
-	SSHKeyPath   string `json:"ssh_key_path"`
+	Region       string `json:"region" mapstructure:"region"`
+	InstanceType string `json:"instance_type" mapstructure:"instance_type"`
+	AMI          string `json:"ami" mapstructure:"ami"`
+	KeyName      string `json:"key_name" mapstructure:"key_name"`
+	VpcID        string `json:"vpc_id" mapstructure:"vpc_id"`
+	SubnetID     string `json:"subnet_id" mapstructure:"subnet_id"`
+	SSHKeyPath   string `json:"ssh_key_path" mapstructure:"ssh_key_path"`
 }
 
 // GCPConfig represents GCP-specific configuration
 type GCPConfig struct {
-	Project     string `json:"project"`
-	Zone        string `json:"zone"`
-	MachineType string `json:"machine_type"`
-	Network     string `json:"network"`
-	SSHKeyPath  string `json:"ssh_key_path"`
+	Project     string `json:"project" mapstructure:"project"`
+	Zone        string `json:"zone" mapstructure:"zone"`
+	MachineType string `json:"machine_type" mapstructure:"machine_type"`
+	Network     string `json:"network" mapstructure:"network"`
+	SSHKeyPath  string `json:"ssh_key_path" mapstructure:"ssh_key_path"`
 }
 
 // BareMetalConfig represents bare metal/VM SSH deployment configuration
 type BareMetalConfig struct {
-	Host       string `json:"host"`
-	User       string `json:"user"`
-	SSHKeyPath string `json:"ssh_key_path"`
-	Port       int    `json:"port"`
+	Host       string `json:"host" mapstructure:"host"`
+	User       string `json:"user" mapstructure:"user"`
+	SSHKeyPath string `json:"ssh_key_path" mapstructure:"ssh_key_path"`
+	Port       int    `json:"port" mapstructure:"port"`
 }
 
 var (
@@ -174,6 +175,26 @@ func Initialize() error {
 	// Unmarshal config
 	if err := viper.Unmarshal(&globalConfig); err != nil {
 		return fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	// Load tokens from keyring
+	for i, inst := range globalConfig.Instances {
+		if inst.Token == "" || inst.Token == "keyring" {
+			key := fmt.Sprintf("instance-%s-token", inst.Name)
+			token, err := getToken(key)
+			if err != nil {
+				// We don't want to crash if one token is missing, but if the keyring is broken we should know.
+				// For now, let's just log it effectively by returning the error if it's a serious keyring issue,
+				// or maybe just ignoring it if it's "item not found".
+				// Since we don't know the exact "not found" error type easily without importing the lib,
+				// and we want to stop "silent failures", let's strictly return the error.
+				// If the user expects it to work and it doesn't, they need to know.
+				return fmt.Errorf("failed to retrieve token for instance %s: %w", inst.Name, err)
+			}
+			if token != "" {
+				globalConfig.Instances[i].Token = token
+			}
+		}
 	}
 
 	return nil
@@ -226,7 +247,7 @@ func createDefaultConfig() error {
 		LastUpdateCheckTime: time.Now().Format(time.RFC3339),
 		Provider:            "local",
 		Environment:         "development",
-		Settings:            make(map[string]interface{}),
+		Settings:            make(map[string]any),
 		Git: GitConfig{
 			Repository: "https://github.com/coollabsio/coolify.git",
 			Branch:     "v4.x",
@@ -289,7 +310,21 @@ func Save(cfg *Config) error {
 	globalConfig = cfg
 
 	// Update viper
-	viper.Set("instances", cfg.Instances)
+	// Update viper
+	// Prepare safe instances (tokens in keyring)
+	safeInstances := make([]Instance, len(cfg.Instances))
+	for i, inst := range cfg.Instances {
+		safeInstances[i] = inst
+		// Save token to keyring
+		if inst.Token != "" {
+			key := fmt.Sprintf("instance-%s-token", inst.Name)
+			if err := setToken(key, inst.Token); err == nil {
+				safeInstances[i].Token = "keyring"
+			}
+		}
+	}
+	viper.Set("instances", safeInstances)
+
 	viper.Set("current_context", cfg.CurrentContext)
 	viper.Set("lastUpdateCheckTime", cfg.LastUpdateCheckTime)
 
@@ -362,38 +397,92 @@ func Path() string {
 	return filepath.Join(configDir, "config.json")
 }
 
-// ValidateConfig validates the current configuration
-func ValidateConfig() error {
-	if globalConfig == nil {
+// Merge applies overrides to the configuration
+func (c *Config) Merge(overrides map[string]string) error {
+	for k, v := range overrides {
+		switch k {
+		// Azure overrides
+		case "location":
+			c.Azure.Location = v
+		case "vm_size":
+			c.Azure.VMSize = v
+		case "disk_size":
+			// Assuming disk size might be int in struct but string in override
+			// c.Azure.DiskSize = v (AzureConfig doesn't seem to have DiskSize based on file view, checking...)
+			// Actually AzureConfig only has: Location, ResourceGroup, VMName, VMSize, AdminUsername, SSHKeyPath, SubscriptionID
+			// The Model collected "disk_size" but AzureConfig doesn't have it.
+			// skipping for now or adding to Settings if needed.
+			c.Settings["disk_size"] = v
+		case "ssh_key":
+			// Map "ssh_key" to actual SSHKeyPath fields for all providers
+			c.Azure.SSHKeyPath = v
+			c.AWS.SSHKeyPath = v
+			c.GCP.SSHKeyPath = v
+			c.BareMetal.SSHKeyPath = v
+
+		// Local overrides
+		case "app_port":
+			if p, err := strconv.Atoi(v); err == nil {
+				c.Local.AppPort = p
+			}
+		case "ws_port":
+			if p, err := strconv.Atoi(v); err == nil {
+				c.Local.WebSocketPort = p
+			}
+		case "data_dir":
+			// LocalConfig works with WorkDir
+			c.Local.WorkDir = v
+
+		// Production overrides
+		case "domain":
+			c.Production.Domain = v
+		case "ssh_host":
+			// ProductionConfig doesn't seem to have SSHHost?
+			// Checking ProductionConfig struct: Domain, SSLEmail, Kubeconfig, Namespace.
+			// Maybe it maps to Settings?
+			c.Settings["ssh_host"] = v
+		case "ssh_user":
+			c.Settings["ssh_user"] = v
+
+		// Generic/Other
+		default:
+			c.Settings[k] = v
+		}
+	}
+	return nil
+}
+
+func (c *Config) Validate() error {
+	if c == nil {
 		return fmt.Errorf("configuration not initialized")
 	}
 
-	switch globalConfig.Provider {
+	switch c.Provider {
 	case "azure":
-		if globalConfig.Azure.Location == "" {
+		if c.Azure.Location == "" {
 			return fmt.Errorf("azure location is required")
 		}
-		if globalConfig.Azure.ResourceGroup == "" {
+		if c.Azure.ResourceGroup == "" {
 			return fmt.Errorf("azure resource group is required")
 		}
 	case "local":
-		if globalConfig.Local.WorkDir == "" {
+		if c.Local.WorkDir == "" {
 			return fmt.Errorf("local work directory is required")
 		}
 	case "production":
-		if globalConfig.Production.Domain == "" {
+		if c.Production.Domain == "" {
 			return fmt.Errorf("production domain is required")
 		}
 	case "aws":
-		if globalConfig.AWS.Region == "" {
+		if c.AWS.Region == "" {
 			return fmt.Errorf("AWS region is required")
 		}
 	case "gcp":
-		if globalConfig.GCP.Project == "" {
+		if c.GCP.Project == "" {
 			return fmt.Errorf("GCP project is required")
 		}
 	case "baremetal":
-		if globalConfig.BareMetal.Host == "" {
+		if c.BareMetal.Host == "" {
 			return fmt.Errorf("bare Metal host is required")
 		}
 	default:

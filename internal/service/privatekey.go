@@ -42,7 +42,7 @@ func NewPrivateKeyService(client *api.Client) *PrivateKeyService {
 // List retrieves all private keys
 func (s *PrivateKeyService) List(ctx context.Context) ([]PrivateKey, error) {
 	var keys []PrivateKey
-	err := s.client.Get("security/keys", &keys)
+	err := s.client.Get(ctx, "security/keys", &keys)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list private keys: %w", err)
 	}
@@ -52,7 +52,7 @@ func (s *PrivateKeyService) List(ctx context.Context) ([]PrivateKey, error) {
 // Get retrieves a specific private key by UUID
 func (s *PrivateKeyService) Get(ctx context.Context, uuid string) (*PrivateKey, error) {
 	var key PrivateKey
-	err := s.client.Get(fmt.Sprintf("security/keys/%s", uuid), &key)
+	err := s.client.Get(ctx, fmt.Sprintf("security/keys/%s", uuid), &key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get private key %s: %w", uuid, err)
 	}
@@ -62,7 +62,7 @@ func (s *PrivateKeyService) Get(ctx context.Context, uuid string) (*PrivateKey, 
 // Create creates a new private key
 func (s *PrivateKeyService) Create(ctx context.Context, req PrivateKeyCreateRequest) (*PrivateKey, error) {
 	var key PrivateKey
-	err := s.client.Post("security/keys", req, &key)
+	err := s.client.Post(ctx, "security/keys", req, &key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create private key: %w", err)
 	}
@@ -71,7 +71,7 @@ func (s *PrivateKeyService) Create(ctx context.Context, req PrivateKeyCreateRequ
 
 // Delete deletes a private key by UUID
 func (s *PrivateKeyService) Delete(ctx context.Context, uuid string) error {
-	err := s.client.Delete(fmt.Sprintf("security/keys/%s", uuid))
+	err := s.client.Delete(ctx, fmt.Sprintf("security/keys/%s", uuid))
 	if err != nil {
 		return fmt.Errorf("failed to delete private key %s: %w", uuid, err)
 	}

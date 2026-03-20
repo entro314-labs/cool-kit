@@ -52,7 +52,7 @@ func runLs(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch application info
-	app, err := client.GetApplication(appUUID)
+	app, err := client.GetApplication(cmd.Context(), appUUID)
 	if err != nil {
 		ui.Error("Failed to fetch application info")
 		return fmt.Errorf("failed to fetch application: %w", err)

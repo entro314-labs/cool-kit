@@ -293,7 +293,7 @@ func Reset(force bool) error {
 			return err
 		}
 		if confirm != "yes" {
-			ui.Info("Reset cancelled")
+			ui.Info("Reset canceled")
 			return nil
 		}
 	}

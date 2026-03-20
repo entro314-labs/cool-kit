@@ -27,7 +27,7 @@ type AzureProvider struct {
 func NewAzureProvider(cfg *config.Config) (*AzureProvider, error) {
 	// Ensure Settings map is initialized
 	if cfg.Settings == nil {
-		cfg.Settings = make(map[string]interface{})
+		cfg.Settings = make(map[string]any)
 	}
 
 	provider := &AzureProvider{

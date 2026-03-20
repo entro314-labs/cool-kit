@@ -34,7 +34,7 @@ func runLink(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if !overwrite {
-			ui.Dim("Cancelled")
+			ui.Dim("Canceled")
 			return nil
 		}
 		ui.Spacer()
@@ -49,7 +49,7 @@ func runLink(cmd *cobra.Command, args []string) error {
 
 	// List applications
 	ui.Info("Loading applications...")
-	apps, err := client.ListApplications()
+	apps, err := client.ListApplications(cmd.Context())
 	if err != nil {
 		ui.Error("Failed to load applications")
 		return fmt.Errorf("failed to list applications: %w", err)

@@ -30,7 +30,7 @@ func Deploy() error {
 		return err
 	}
 	if !proceed {
-		ui.Info("Deployment cancelled")
+		ui.Info("Deployment canceled")
 		return nil
 	}
 
@@ -317,7 +317,7 @@ func Rollback() error {
 		return err
 	}
 	if !confirmed {
-		ui.Info("Rollback cancelled")
+		ui.Info("Rollback canceled")
 		return nil
 	}
 
@@ -398,7 +398,7 @@ func ManageConfig() error {
 			return err
 		}
 		if !confirmed {
-			ui.Info("Reset cancelled")
+			ui.Info("Reset canceled")
 			return nil
 		}
 

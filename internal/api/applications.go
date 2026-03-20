@@ -7,38 +7,23 @@ import (
 )
 
 // ListApplications returns all applications
-func (c *Client) ListApplications() ([]Application, error) {
-	var apps []Application
-	err := c.Get("/applications", &apps)
-	return apps, err
-}
-
-// ListApplicationsWithContext lists all applications (CAGC pattern with context)
-func (c *Client) ListApplicationsWithContext(ctx context.Context) ([]Application, error) {
+func (c *Client) ListApplications(ctx context.Context) ([]Application, error) {
 	var applications []Application
-	err := c.doRequest(ctx, http.MethodGet, "/applications", nil, &applications)
+	err := c.Get(ctx, "/applications", &applications)
 	return applications, err
 }
 
 // GetApplication returns an application by UUID
-func (c *Client) GetApplication(uuid string) (*Application, error) {
+func (c *Client) GetApplication(ctx context.Context, uuid string) (*Application, error) {
 	var app Application
-	err := c.Get("/applications/"+uuid, &app)
+	err := c.Get(ctx, "/applications/"+uuid, &app)
 	return &app, err
 }
 
-// GetApplicationWithContext gets an application by UUID (CAGC pattern with context)
-func (c *Client) GetApplicationWithContext(ctx context.Context, uuid string) (*Application, error) {
-	path := fmt.Sprintf("/applications/%s", uuid)
-	var application Application
-	err := c.doRequest(ctx, http.MethodGet, path, nil, &application)
-	return &application, err
-}
-
 // CreatePublicApp creates an application from a public git repository
-func (c *Client) CreatePublicApp(req *CreatePublicAppRequest) (*CreateAppResponse, error) {
+func (c *Client) CreatePublicApp(ctx context.Context, req *CreatePublicAppRequest) (*CreateAppResponse, error) {
 	var resp CreateAppResponse
-	err := c.Post("/applications/public", req, &resp)
+	err := c.Post(ctx, "/applications/public", req, &resp)
 	return &resp, err
 }
 
@@ -50,9 +35,9 @@ func (c *Client) CreatePublicApplication(ctx context.Context, app Application) (
 }
 
 // CreateDockerImageApp creates an application from a Docker registry image
-func (c *Client) CreateDockerImageApp(req *CreateDockerImageAppRequest) (*CreateAppResponse, error) {
+func (c *Client) CreateDockerImageApp(ctx context.Context, req *CreateDockerImageAppRequest) (*CreateAppResponse, error) {
 	var resp CreateAppResponse
-	err := c.Post("/applications/dockerimage", req, &resp)
+	err := c.Post(ctx, "/applications/dockerimage", req, &resp)
 	return &resp, err
 }
 
@@ -64,30 +49,13 @@ func (c *Client) CreateDockerImageApplication(ctx context.Context, app Applicati
 }
 
 // UpdateApplication updates an application
-func (c *Client) UpdateApplication(uuid string, updates map[string]interface{}) error {
-	return c.Patch("/applications/"+uuid, updates, nil)
-}
-
-// UpdateApplicationWithContext updates an existing application (CAGC pattern)
-func (c *Client) UpdateApplicationWithContext(ctx context.Context, uuid string, app Application) (*CreateResponse, error) {
-	path := fmt.Sprintf("/applications/%s", uuid)
-	var response CreateResponse
-	err := c.doRequest(ctx, http.MethodPatch, path, app, &response)
-	return &response, err
+func (c *Client) UpdateApplication(ctx context.Context, uuid string, updates UpdateApplicationRequest) error {
+	return c.Patch(ctx, "/applications/"+uuid, updates, nil)
 }
 
 // DeleteApplication deletes an application
-func (c *Client) DeleteApplication(uuid string) error {
-	return c.Delete("/applications/" + uuid)
-}
-
-// DeleteApplicationWithContext deletes an application (CAGC pattern)
-func (c *Client) DeleteApplicationWithContext(ctx context.Context, uuid string, deleteConfigurations, deleteVolumes, dockerCleanup, deleteConnectedNetworks bool) (*CreateResponse, error) {
-	path := fmt.Sprintf("/applications/%s?delete_configurations=%t&delete_volumes=%t&docker_cleanup=%t&delete_connected_networks=%t",
-		uuid, deleteConfigurations, deleteVolumes, dockerCleanup, deleteConnectedNetworks)
-	var response CreateResponse
-	err := c.doRequest(ctx, http.MethodDelete, path, nil, &response)
-	return &response, err
+func (c *Client) DeleteApplication(ctx context.Context, uuid string) error {
+	return c.Delete(ctx, "/applications/"+uuid)
 }
 
 // StartApplication starts an application (CAGC pattern)
@@ -135,9 +103,9 @@ func (c *Client) ExecuteCommand(ctx context.Context, uuid string, command string
 }
 
 // GetApplicationEnvVars returns environment variables for an application
-func (c *Client) GetApplicationEnvVars(uuid string) ([]EnvVar, error) {
+func (c *Client) GetApplicationEnvVars(ctx context.Context, uuid string) ([]EnvVar, error) {
 	var envVars []EnvVar
-	err := c.Get(fmt.Sprintf("/applications/%s/envs", uuid), &envVars)
+	err := c.Get(ctx, fmt.Sprintf("/applications/%s/envs", uuid), &envVars)
 	return envVars, err
 }
 
@@ -150,14 +118,16 @@ func (c *Client) ListApplicationEnvs(ctx context.Context, uuid string) ([]Enviro
 }
 
 // CreateApplicationEnvVar creates an environment variable for an application
-func (c *Client) CreateApplicationEnvVar(uuid, key, value string, isBuildTime, isPreview bool) (*EnvVar, error) {
-	body := map[string]interface{}{
-		"key":        key,
-		"value":      value,
-		"is_preview": isPreview,
+func (c *Client) CreateApplicationEnvVar(ctx context.Context, uuid, key, value string, isBuildTime, isPreview bool) (*EnvVar, error) {
+	body := EnvironmentVariable{
+		Key:         key,
+		Value:       value,
+		IsPreview:   isPreview,
+		IsBuildTime: isBuildTime,
 	}
+	// Note: API returns EnvVar, but input is EnvironmentVariable style.
 	var envVar EnvVar
-	err := c.Post(fmt.Sprintf("/applications/%s/envs", uuid), body, &envVar)
+	err := c.Post(ctx, fmt.Sprintf("/applications/%s/envs", uuid), body, &envVar)
 	return &envVar, err
 }
 
@@ -178,8 +148,8 @@ func (c *Client) UpdateApplicationEnv(ctx context.Context, appUUID string, env E
 }
 
 // DeleteApplicationEnvVar deletes an environment variable
-func (c *Client) DeleteApplicationEnvVar(appUUID, envUUID string) error {
-	return c.Delete(fmt.Sprintf("/applications/%s/envs/%s", appUUID, envUUID))
+func (c *Client) DeleteApplicationEnvVar(ctx context.Context, appUUID, envUUID string) error {
+	return c.Delete(ctx, fmt.Sprintf("/applications/%s/envs/%s", appUUID, envUUID))
 }
 
 // DeleteApplicationEnv deletes an environment variable for an application (CAGC pattern)
@@ -201,16 +171,16 @@ func (c *Client) UpdateApplicationEnvsBulk(ctx context.Context, appUUID string, 
 }
 
 // ListGitHubApps returns all GitHub Apps configured in Coolify
-func (c *Client) ListGitHubApps() ([]GitHubApp, error) {
+func (c *Client) ListGitHubApps(ctx context.Context) ([]GitHubApp, error) {
 	var apps []GitHubApp
-	err := c.Get("/github-apps", &apps)
+	err := c.Get(ctx, "/github-apps", &apps)
 	return apps, err
 }
 
 // CreatePrivateGitHubApp creates an application from a private GitHub repository using a GitHub App
-func (c *Client) CreatePrivateGitHubApp(req *CreatePrivateGitHubAppRequest) (*CreateAppResponse, error) {
+func (c *Client) CreatePrivateGitHubApp(ctx context.Context, req *CreatePrivateGitHubAppRequest) (*CreateAppResponse, error) {
 	var resp CreateAppResponse
-	err := c.Post("/applications/private-github-app", req, &resp)
+	err := c.Post(ctx, "/applications/private-github-app", req, &resp)
 	return &resp, err
 }
 

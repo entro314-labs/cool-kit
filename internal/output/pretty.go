@@ -15,7 +15,7 @@ func NewPrettyFormatter(opts Options) *PrettyFormatter {
 }
 
 // Format formats the data as pretty-printed JSON
-func (f *PrettyFormatter) Format(data interface{}) error {
+func (f *PrettyFormatter) Format(data any) error {
 	encoder := json.NewEncoder(f.opts.Writer)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(data)

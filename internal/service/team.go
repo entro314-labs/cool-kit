@@ -38,7 +38,7 @@ func NewTeamService(client *api.Client) *TeamService {
 // List retrieves all teams
 func (s *TeamService) List(ctx context.Context) ([]Team, error) {
 	var teams []Team
-	err := s.client.Get("teams", &teams)
+	err := s.client.Get(ctx, "teams", &teams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list teams: %w", err)
 	}
@@ -48,7 +48,7 @@ func (s *TeamService) List(ctx context.Context) ([]Team, error) {
 // Get retrieves a team by ID
 func (s *TeamService) Get(ctx context.Context, id string) (*Team, error) {
 	var team Team
-	err := s.client.Get(fmt.Sprintf("teams/%s", id), &team)
+	err := s.client.Get(ctx, fmt.Sprintf("teams/%s", id), &team)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get team %s: %w", id, err)
 	}
@@ -58,7 +58,7 @@ func (s *TeamService) Get(ctx context.Context, id string) (*Team, error) {
 // Current retrieves the currently authenticated team
 func (s *TeamService) Current(ctx context.Context) (*Team, error) {
 	var team Team
-	err := s.client.Get("teams/current", &team)
+	err := s.client.Get(ctx, "teams/current", &team)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current team: %w", err)
 	}
@@ -68,7 +68,7 @@ func (s *TeamService) Current(ctx context.Context) (*Team, error) {
 // ListMembers retrieves members of a specific team
 func (s *TeamService) ListMembers(ctx context.Context, teamID string) ([]TeamMember, error) {
 	var members []TeamMember
-	err := s.client.Get(fmt.Sprintf("teams/%s/members", teamID), &members)
+	err := s.client.Get(ctx, fmt.Sprintf("teams/%s/members", teamID), &members)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list members for team %s: %w", teamID, err)
 	}
@@ -78,7 +78,7 @@ func (s *TeamService) ListMembers(ctx context.Context, teamID string) ([]TeamMem
 // CurrentMembers retrieves members of the currently authenticated team
 func (s *TeamService) CurrentMembers(ctx context.Context) ([]TeamMember, error) {
 	var members []TeamMember
-	err := s.client.Get("teams/current/members", &members)
+	err := s.client.Get(ctx, "teams/current/members", &members)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list current team members: %w", err)
 	}

@@ -304,7 +304,7 @@ func TryParseJSON(s string) string {
 		return s
 	}
 
-	var data interface{}
+	var data any
 	if err := json.Unmarshal([]byte(s), &data); err != nil {
 		return s
 	}

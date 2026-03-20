@@ -163,8 +163,8 @@ func collectDockerVolumes() ([]string, error) {
 			continue
 		}
 
-		volumes := strings.Split(strings.TrimSpace(string(volOut)), "\n")
-		for _, vol := range volumes {
+		volumes := strings.SplitSeq(strings.TrimSpace(string(volOut)), "\n")
+		for vol := range volumes {
 			if vol != "" && !strings.HasPrefix(vol, "/") {
 				volumePath := "/var/lib/docker/volumes/" + vol
 				volumeSet[volumePath] = true
@@ -188,8 +188,8 @@ func calculateTotalSize(paths []string) (string, error) {
 	duArgs := append([]string{"-csh"}, paths...)
 	out, err := exec.Command("du", duArgs...).Output()
 	if err == nil {
-		lines := strings.Split(string(out), "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(string(out), "\n")
+		for line := range lines {
 			if strings.Contains(line, "total") {
 				parts := strings.Fields(line)
 				if len(parts) > 0 {

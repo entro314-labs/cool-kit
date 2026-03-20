@@ -25,10 +25,10 @@ type InfrastructureConfig struct {
 
 // NetworkingConfig contains networking settings
 type NetworkingConfig struct {
-	AppPort            int    `json:"app_port"`
-	SSHPort            int    `json:"ssh_port"`
-	WebSocketPort      int    `json:"websocket_port"`
-	VNetAddressPrefix  string `json:"vnet_address_prefix"`
+	AppPort             int    `json:"app_port"`
+	SSHPort             int    `json:"ssh_port"`
+	WebSocketPort       int    `json:"websocket_port"`
+	VNetAddressPrefix   string `json:"vnet_address_prefix"`
 	SubnetAddressPrefix string `json:"subnet_address_prefix"`
 }
 
@@ -59,10 +59,10 @@ type PathsConfig struct {
 
 // DockerConfig contains Docker image configurations
 type DockerConfig struct {
-	RegistryURL    string `json:"registry_url"`
-	HelperImage    string `json:"helper_image"`
-	AppImage       string `json:"app_image"`
-	RealtimeImage  string `json:"realtime_image"`
+	RegistryURL   string `json:"registry_url"`
+	HelperImage   string `json:"helper_image"`
+	AppImage      string `json:"app_image"`
+	RealtimeImage string `json:"realtime_image"`
 }
 
 // DefaultConfig returns the default Azure configuration
@@ -81,10 +81,10 @@ func DefaultConfig() *Config {
 			OSDiskSizeGB:     30,
 		},
 		Networking: NetworkingConfig{
-			AppPort:            80,
-			SSHPort:            22,
-			WebSocketPort:      6001,
-			VNetAddressPrefix:  "10.0.0.0/16",
+			AppPort:             80,
+			SSHPort:             22,
+			WebSocketPort:       6001,
+			VNetAddressPrefix:   "10.0.0.0/16",
 			SubnetAddressPrefix: "10.0.1.0/24",
 		},
 		Coolify: CoolifyConfig{

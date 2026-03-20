@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -30,7 +31,7 @@ Examples:
   cool-kit deploy --prod       # Explicitly deploy to production
   cool-kit deploy --preview    # Create preview deployment`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runDeploy()
+		return runDeploy(cmd.Context())
 	},
 }
 
@@ -39,7 +40,7 @@ func init() {
 	deployCmd.Flags().BoolVar(&deployPreviewFlag, "preview", false, "Create preview deployment")
 }
 
-func runDeploy() error {
+func runDeploy(ctx context.Context) error {
 	if err := checkLogin(); err != nil {
 		return err
 	}
@@ -64,7 +65,7 @@ func runDeploy() error {
 		ui.Section("New Project Setup")
 		ui.Dim("Let's configure your project for deployment")
 
-		setupResult, err := appdeploy.FirstTimeSetup(client, globalCfg)
+		setupResult, err := appdeploy.FirstTimeSetup(ctx, client, globalCfg)
 		if err != nil {
 			return err
 		}
@@ -119,7 +120,7 @@ func runDeploy() error {
 
 	// Deploy based on method
 	if projectCfg.DeployMethod == config.DeployMethodDocker {
-		return appdeploy.DeployDocker(client, globalCfg, projectCfg, deploymentConfig, prNumber, verbose)
+		return appdeploy.DeployDocker(ctx, client, globalCfg, projectCfg, deploymentConfig, prNumber, verbose)
 	}
-	return appdeploy.DeployGit(client, globalCfg, projectCfg, deploymentConfig, prNumber, verbose)
+	return appdeploy.DeployGit(ctx, client, globalCfg, projectCfg, deploymentConfig, prNumber, verbose)
 }

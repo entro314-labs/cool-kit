@@ -11,7 +11,7 @@ import (
 )
 
 // provisionServicesTask provisions detected services and updates environment variables
-func provisionServicesTask(client *api.Client, projectCfg *config.ProjectConfig, deploymentConfig *smart.DeploymentConfig) ui.Task {
+func provisionServicesTask(ctx context.Context, client *api.Client, projectCfg *config.ProjectConfig, deploymentConfig *smart.DeploymentConfig) ui.Task {
 	return ui.Task{
 		Name:         "provision-services",
 		ActiveName:   fmt.Sprintf("Provisioning %d service(s)...", len(deploymentConfig.Services)),
@@ -27,14 +27,13 @@ func provisionServicesTask(client *api.Client, projectCfg *config.ProjectConfig,
 			)
 
 			// Provision all services
-			result, err := provisioner.Provision(deploymentConfig)
+			result, err := provisioner.Provision(ctx, deploymentConfig)
 			if err != nil {
 				return fmt.Errorf("service provisioning failed: %w", err)
 			}
 
 			// Update application with generated environment variables
 			if len(result.EnvironmentVars) > 0 {
-				ctx := context.Background()
 				var envVars []api.EnvironmentVariable
 				for key, value := range result.EnvironmentVars {
 					envVars = append(envVars, api.EnvironmentVariable{

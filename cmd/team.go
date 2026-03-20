@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -29,7 +28,7 @@ var teamListCmd = &cobra.Command{
 		}
 
 		svc := service.NewTeamService(client)
-		teams, err := svc.List(context.Background())
+		teams, err := svc.List(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -49,7 +48,7 @@ var teamCurrentCmd = &cobra.Command{
 		}
 
 		svc := service.NewTeamService(client)
-		team, err := svc.Current(context.Background())
+		team, err := svc.Current(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -73,9 +72,9 @@ var teamMembersCmd = &cobra.Command{
 		var listErr error
 
 		if len(args) > 0 {
-			members, listErr = svc.ListMembers(context.Background(), args[0])
+			members, listErr = svc.ListMembers(cmd.Context(), args[0])
 		} else {
-			members, listErr = svc.CurrentMembers(context.Background())
+			members, listErr = svc.CurrentMembers(cmd.Context())
 		}
 		if listErr != nil {
 			return listErr
@@ -101,7 +100,7 @@ func getAPIClient() (*api.Client, error) {
 }
 
 // formatOutput formats and prints output
-func formatOutput(format string, data interface{}) error {
+func formatOutput(format string, data any) error {
 	if format == "" {
 		format = output.FormatTable
 	}

@@ -30,8 +30,6 @@ type BuildOptions struct {
 func Build(opts *BuildOptions) (err error) {
 	// Generate Dockerfile if one doesn't exist
 	dockerfilePath := filepath.Join(opts.Dir, "Dockerfile")
-	tempDockerfile := false
-
 	if _, statErr := os.Stat(dockerfilePath); os.IsNotExist(statErr) {
 		content := GenerateDockerfile(opts.Framework)
 		tempDockerfilePath := filepath.Join(opts.Dir, "Dockerfile.cdp")
@@ -39,19 +37,11 @@ func Build(opts *BuildOptions) (err error) {
 			return fmt.Errorf("failed to write Dockerfile: %w", writeErr)
 		}
 		dockerfilePath = tempDockerfilePath
-		tempDockerfile = true
-	}
-
-	// Ensure cleanup happens even on panic or early return
-	if tempDockerfile {
+		// Ensure cleanup of generated Dockerfile
 		defer func() {
-			// Recover from panic if any, clean up, then re-panic
-			if r := recover(); r != nil {
-				_ = os.Remove(dockerfilePath)
-				panic(r)
+			if err := os.Remove(dockerfilePath); err != nil && opts.Verbose {
+				fmt.Printf("Failed to remove temp Dockerfile: %v\n", err)
 			}
-			// Normal cleanup
-			_ = os.Remove(dockerfilePath)
 		}()
 	}
 
@@ -136,7 +126,7 @@ func Build(opts *BuildOptions) (err error) {
 // GenerateTag generates a unique tag for the image
 func GenerateTag(env string) string {
 	// Create a short hash based on timestamp
-	hash := sha256.Sum256([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+	hash := sha256.Sum256(fmt.Appendf(nil, "%d", time.Now().UnixNano()))
 	shortHash := fmt.Sprintf("%x", hash[:4])
 	return fmt.Sprintf("%s-%s", env, shortHash)
 }

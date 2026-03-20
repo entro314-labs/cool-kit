@@ -94,20 +94,20 @@ func (c *SDKClient) CreateInstance(opts VMCreateOpts) (*VMInfo, error) {
 	}
 
 	instance := &computepb.Instance{
-		Name:        strPtr(opts.Name),
-		MachineType: strPtr(machineType),
+		Name:        new(opts.Name),
+		MachineType: new(machineType),
 		Labels:      labels,
 		Tags: &computepb.Tags{
 			Items: tags,
 		},
 		Disks: []*computepb.AttachedDisk{
 			{
-				Boot:       boolPtr(true),
-				AutoDelete: boolPtr(true),
+				Boot:       new(true),
+				AutoDelete: new(true),
 				InitializeParams: &computepb.AttachedDiskInitializeParams{
-					SourceImage: strPtr(sourceImage),
-					DiskSizeGb:  int64Ptr(diskSizeGB),
-					DiskType:    strPtr(fmt.Sprintf("zones/%s/diskTypes/pd-balanced", c.zone)),
+					SourceImage: new(sourceImage),
+					DiskSizeGb:  new(diskSizeGB),
+					DiskType:    new(fmt.Sprintf("zones/%s/diskTypes/pd-balanced", c.zone)),
 				},
 			},
 		},
@@ -115,8 +115,8 @@ func (c *SDKClient) CreateInstance(opts VMCreateOpts) (*VMInfo, error) {
 			{
 				AccessConfigs: []*computepb.AccessConfig{
 					{
-						Name: strPtr("External NAT"),
-						Type: strPtr("ONE_TO_ONE_NAT"),
+						Name: new("External NAT"),
+						Type: new("ONE_TO_ONE_NAT"),
 					},
 				},
 			},
@@ -128,8 +128,8 @@ func (c *SDKClient) CreateInstance(opts VMCreateOpts) (*VMInfo, error) {
 		instance.Metadata = &computepb.Metadata{
 			Items: []*computepb.Items{
 				{
-					Key:   strPtr("startup-script"),
-					Value: strPtr(opts.StartupScript),
+					Key:   new("startup-script"),
+					Value: new(opts.StartupScript),
 				},
 			},
 		}
@@ -180,7 +180,7 @@ func (c *SDKClient) GetCoolifyInstance() (*VMInfo, error) {
 	req := &computepb.ListInstancesRequest{
 		Project: c.project,
 		Zone:    c.zone,
-		Filter:  strPtr("labels.application=coolify"),
+		Filter:  new("labels.application=coolify"),
 	}
 
 	it := c.instances.List(c.ctx, req)
@@ -279,14 +279,17 @@ func instanceToVMInfo(instance *computepb.Instance) *VMInfo {
 	return info
 }
 
+//go:fix inline
 func strPtr(s string) *string {
-	return &s
+	return new(s)
 }
 
+//go:fix inline
 func boolPtr(b bool) *bool {
-	return &b
+	return new(b)
 }
 
+//go:fix inline
 func int64Ptr(i int64) *int64 {
-	return &i
+	return new(i)
 }

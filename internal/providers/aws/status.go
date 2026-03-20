@@ -188,8 +188,8 @@ done
 		return fmt.Errorf("failed to check services: %w", err)
 	}
 
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(output), "\n")
+	for line := range lines {
 		parts := strings.Split(line, ":")
 		if len(parts) < 2 {
 			continue
@@ -224,8 +224,8 @@ df -h / | awk 'NR==2{printf "Disk: %s / %s (%s)\n", $3, $2, $5}'
 		return fmt.Errorf("failed to check resources: %w", err)
 	}
 
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(output), "\n")
+	for line := range lines {
 		ui.Dim(fmt.Sprintf("  %s", line))
 	}
 

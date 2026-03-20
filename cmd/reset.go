@@ -58,7 +58,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !confirm {
-		return fmt.Errorf("cancelled")
+		return fmt.Errorf("canceled")
 	}
 
 	// Double confirm
@@ -67,7 +67,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !confirm2 {
-		return fmt.Errorf("cancelled")
+		return fmt.Errorf("canceled")
 	}
 
 	client := api.NewClient(globalCfg.CoolifyURL, globalCfg.CoolifyToken)
@@ -75,7 +75,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 	// Delete Coolify app
 	if projectCfg.AppUUID != "" {
 		ui.Info("Deleting Coolify app...")
-		err := client.DeleteApplication(projectCfg.AppUUID)
+		err := client.DeleteApplication(cmd.Context(), projectCfg.AppUUID)
 		if err != nil {
 			ui.Warning(fmt.Sprintf("Failed to delete app: %v", err))
 		} else {
@@ -94,7 +94,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 		// Try up to 5 times with increasing delays
 		var lastErr error
 		for attempt := 1; attempt <= 5; attempt++ {
-			err := client.DeleteProject(projectCfg.ProjectUUID)
+			err := client.DeleteProject(cmd.Context(), projectCfg.ProjectUUID)
 			if err == nil {
 				ui.Success("Deleted Coolify project")
 				break

@@ -114,7 +114,7 @@ func getInstanceStatus(project, zone string) (*InstanceStatus, error) {
 		return nil, fmt.Errorf("failed to list instances: %w", err)
 	}
 
-	var instances []map[string]interface{}
+	var instances []map[string]any
 	if err := json.Unmarshal(output, &instances); err != nil {
 		return nil, fmt.Errorf("failed to parse instances: %w", err)
 	}
@@ -132,11 +132,11 @@ func getInstanceStatus(project, zone string) (*InstanceStatus, error) {
 	}
 
 	// Extract IPs from nested structure
-	if networkInterfaces, ok := inst["networkInterfaces"].([]interface{}); ok && len(networkInterfaces) > 0 {
-		if ni, ok := networkInterfaces[0].(map[string]interface{}); ok {
+	if networkInterfaces, ok := inst["networkInterfaces"].([]any); ok && len(networkInterfaces) > 0 {
+		if ni, ok := networkInterfaces[0].(map[string]any); ok {
 			status.NetworkIP = getString(ni, "networkIP")
-			if accessConfigs, ok := ni["accessConfigs"].([]interface{}); ok && len(accessConfigs) > 0 {
-				if ac, ok := accessConfigs[0].(map[string]interface{}); ok {
+			if accessConfigs, ok := ni["accessConfigs"].([]any); ok && len(accessConfigs) > 0 {
+				if ac, ok := accessConfigs[0].(map[string]any); ok {
 					status.ExternalIP = getString(ac, "natIP")
 				}
 			}
@@ -151,7 +151,7 @@ func getInstanceStatus(project, zone string) (*InstanceStatus, error) {
 	return status, nil
 }
 
-func getString(m map[string]interface{}, key string) string {
+func getString(m map[string]any, key string) string {
 	if v, ok := m[key].(string); ok {
 		return v
 	}
@@ -192,7 +192,7 @@ done`
 		return
 	}
 
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		parts := strings.Split(line, ":")
 		if len(parts) < 2 {
 			continue
@@ -217,7 +217,7 @@ df -h / | awk 'NR==2{printf "Disk: %s / %s (%s)\n", $3, $2, $5}'`
 		return
 	}
 
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		ui.Dim(fmt.Sprintf("  %s", line))
 	}
 }

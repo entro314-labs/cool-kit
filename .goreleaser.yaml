@@ -153,9 +153,19 @@ release:
 
     ## Installation
 
-    ### Homebrew (macOS/Linux)
+    ### Homebrew
     ```bash
-    brew install entro314-labs/tap/cool-kit
+    brew install --cask entro314-labs/homebrew-tap/cool-kit
+    ```
+
+    ### Winget
+    ```powershell
+    winget install Entro314Labs.CoolKit
+    ```
+
+    ### AUR
+    ```bash
+    yay -S cool-kit-bin
     ```
 
     ### Go Install
@@ -174,10 +184,12 @@ release:
     **Full Changelog**: https://github.com/entro314-labs/cool-kit/compare/{{ .PreviousTag }}...{{ .Tag }}
 
 # =============================================================================
-# Homebrew (uncomment when homebrew-tap repo is created)
+# Homebrew Tap (Formula & Casks)
 # =============================================================================
 homebrew_casks:
   - name: cool-kit
+    ids:
+      - default
     repository:
       owner: entro314-labs
       name: homebrew-tap
@@ -187,21 +199,78 @@ homebrew_casks:
     homepage: https://github.com/entro314-labs/cool-kit
     description: "CLI toolkit for Coolify deployments"
     license: MIT
+    skip_upload: "{{ .IsSnapshot }}"
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
     commit_msg_template: "Homebrew Cask update for {{ .ProjectName }} version {{ .Tag }}"
-    
+
     # Casks use declarative binaries and completions, not Ruby install scripts
     binaries:
       - cool-kit
-    
+
     # Define completions if you generate them in your build or have them in the repo
     # Assuming completions are generated/available
     # completions:
     #   bash: completions/cool-kit.bash
     #   zsh: completions/cool-kit.zsh
     #   fish: completions/cool-kit.fish
+
+# =============================================================================
+# Winget (Windows Package Manager)
+# =============================================================================
+winget:
+  - name: cool-kit
+    package_identifier: Entro314Labs.CoolKit
+    publisher: Entro314 Labs
+    short_description: "CLI toolkit for Coolify deployments"
+    license: MIT
+    license_url: "https://github.com/entro314-labs/cool-kit/blob/main/LICENSE"
+    copyright: "Entro314 Labs"
+    homepage: https://github.com/entro314-labs/cool-kit
+    description: "CLI toolkit for Coolify deployments"
+    skip_upload: "{{ .IsSnapshot }}"
+    repository:
+      owner: microsoft
+      name: winget-pkgs
+      branch: master
+      token: "{{ .Env.WINGET_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+# =============================================================================
+# AUR (Arch User Repository)
+# =============================================================================
+aurs:
+  - name: cool-kit-bin
+    ids:
+      - default
+    homepage: https://github.com/entro314-labs/cool-kit
+    description: "CLI toolkit for Coolify deployments"
+    maintainers:
+      - "entro314-labs"
+    license: MIT
+    disable: "{{ .IsSnapshot }}"
+    skip_upload: "{{ .IsSnapshot }}"
+    private_key: "{{ .Env.AUR_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/cool-kit-bin.git"
+    package: |-
+      # bin
+      install -Dm755 "./cool-kit" "${pkgdir}/usr/bin/cool-kit"
+      # license
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/cool-kit/LICENSE"
+      # completions
+      # mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
+      # mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
+      # mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
+      # install -Dm644 "./completions/cool-kit.bash" "${pkgdir}/usr/share/bash-completion/completions/cool-kit"
+      # install -Dm644 "./completions/cool-kit.zsh" "${pkgdir}/usr/share/zsh/site-functions/_cool-kit"
+      # install -Dm644 "./completions/cool-kit.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/cool-kit.fish"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
 
 # =============================================================================
 # Linux packages (deb/rpm)
@@ -228,33 +297,41 @@ dockers_v2:
   - ids:
       - cool-kit
     dockerfile: Dockerfile.goreleaser
-    
+
     images:
       - "ghcr.io/entro314-labs/cool-kit"
-    
+
     tags:
       - "{{ .Version }}"
       - "latest"
       - "{{ .Version }}-amd64"
       - "{{ .Version }}-arm64"
-    
+
     platforms:
       - linux/amd64
       - linux/arm64
-    
+
     # Skip Docker builds in snapshot mode - --load is incompatible with cross-arch builds
     # Production releases (with tags) will still build and push Docker images
     disable: "{{ .IsSnapshot }}"
-    
+
     flags:
       - "--pull"
-      
+
     labels:
       "org.opencontainers.image.created": "{{.Date}}"
       "org.opencontainers.image.title": "{{.ProjectName}}"
       "org.opencontainers.image.revision": "{{.FullCommit}}"
       "org.opencontainers.image.version": "{{.Version}}"
       "org.opencontainers.image.source": "https://github.com/entro314-labs/cool-kit"
+
+# =============================================================================
+# Docker Signing
+# =============================================================================
+docker_signs:
+  - artifacts: all
+    stdin: "{{ .Env.COSIGN_PWD }}"
+
 
 
 # =============================================================================
@@ -263,8 +340,24 @@ dockers_v2:
 sboms:
   - id: archive
     artifacts: archive
+    documents:
+      - "${artifact}.spdx.json"
   - id: source
     artifacts: source
+    documents:
+      - "${artifact}.spdx.json"
+
+# =============================================================================
+# Artifact Signing
+# =============================================================================
+signs:
+  - id: checksum-sign
+    artifacts: checksum
+    stdin: "{{ .Env.COSIGN_PWD }}"
+  - id: artifacts-sign
+    artifacts: all
+    stdin: "{{ .Env.COSIGN_PWD }}"
+
 
 # =============================================================================
 # Source archive

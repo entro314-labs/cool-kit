@@ -1,6 +1,7 @@
 package appdeploy
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 )
 
 // DeployDocker handles Docker-based deployments
-func DeployDocker(client *api.Client, globalCfg *config.GlobalConfig, projectCfg *config.ProjectConfig, deploymentConfig *smart.DeploymentConfig, prNumber int, verbose bool) error {
+func DeployDocker(ctx context.Context, client *api.Client, globalCfg *config.GlobalConfig, projectCfg *config.ProjectConfig, deploymentConfig *smart.DeploymentConfig, prNumber int, verbose bool) error {
 	// Generate tag based on PR number (0 = production, >0 = preview)
 	deployType := "production"
 	if prNumber > 0 {
@@ -41,7 +42,7 @@ func DeployDocker(client *api.Client, globalCfg *config.GlobalConfig, projectCfg
 	ui.Spacer()
 	ui.Divider()
 
-	tasks := buildDockerDeploymentTasks(client, globalCfg, projectCfg, deploymentConfig, tag, needsProjectCreation, verbose)
+	tasks := buildDockerDeploymentTasks(ctx, client, globalCfg, projectCfg, deploymentConfig, tag, needsProjectCreation, verbose)
 
 	if err := ui.RunTasksVerbose(tasks, verbose); err != nil {
 		ui.Error("Deployment setup failed")
@@ -51,7 +52,7 @@ func DeployDocker(client *api.Client, globalCfg *config.GlobalConfig, projectCfg
 	// Watch deployment
 	ui.Info("Watching deployment...")
 
-	success := WatchDeployment(client, projectCfg.AppUUID)
+	success := WatchDeployment(ctx, client, projectCfg.AppUUID)
 
 	if !success {
 		ui.Error("Deployment failed")
@@ -66,7 +67,7 @@ func DeployDocker(client *api.Client, globalCfg *config.GlobalConfig, projectCfg
 	// Get app info for URL
 	ui.Success("Deployment complete")
 
-	app, err := client.GetApplication(projectCfg.AppUUID)
+	app, err := client.GetApplication(ctx, projectCfg.AppUUID)
 	if err == nil && app.Fqdn != nil && *app.Fqdn != "" {
 		ui.Spacer()
 		ui.KeyValue("URL", ui.InfoStyle.Render(*app.Fqdn))
@@ -130,6 +131,7 @@ func buildDockerImage(projectCfg *config.ProjectConfig, tag string, verbose bool
 }
 
 func buildDockerDeploymentTasks(
+	ctx context.Context,
 	client *api.Client,
 	globalCfg *config.GlobalConfig,
 	projectCfg *config.ProjectConfig,
@@ -142,10 +144,10 @@ func buildDockerDeploymentTasks(
 
 	// Create project and environment if needed
 	if needsProjectCreation {
-		tasks = append(tasks, createProjectTask(client, projectCfg))
-		tasks = append(tasks, setupEnvironmentTask(client, projectCfg))
+		tasks = append(tasks, createProjectTask(ctx, client, projectCfg))
+		tasks = append(tasks, setupEnvironmentTask(ctx, client, projectCfg))
 	} else {
-		tasks = append(tasks, checkEnvironmentTask(client, projectCfg))
+		tasks = append(tasks, checkEnvironmentTask(ctx, client, projectCfg))
 	}
 
 	// Push image
@@ -153,27 +155,27 @@ func buildDockerDeploymentTasks(
 
 	// Create app if needed
 	if projectCfg.AppUUID == "" {
-		tasks = append(tasks, createDockerAppTask(client, projectCfg, tag))
+		tasks = append(tasks, createDockerAppTask(ctx, client, projectCfg, tag))
 	}
 
 	// Provision services if detected (only on first deploy)
 	if deploymentConfig != nil && len(deploymentConfig.Services) > 0 {
-		tasks = append(tasks, provisionServicesTask(client, projectCfg, deploymentConfig))
+		tasks = append(tasks, provisionServicesTask(ctx, client, projectCfg, deploymentConfig))
 	}
 
 	// Trigger deployment
-	tasks = append(tasks, triggerDeploymentTask(client, projectCfg, tag))
+	tasks = append(tasks, triggerDeploymentTask(ctx, client, projectCfg, tag))
 
 	return tasks
 }
 
-func createProjectTask(client *api.Client, projectCfg *config.ProjectConfig) ui.Task {
+func createProjectTask(ctx context.Context, client *api.Client, projectCfg *config.ProjectConfig) ui.Task {
 	return ui.Task{
 		Name:         "create-project",
 		ActiveName:   "Creating Coolify project...",
 		CompleteName: "✓ Created Coolify project",
 		Action: func() error {
-			newProject, err := client.CreateProject(projectCfg.Name, "Created by CDP")
+			newProject, err := client.CreateProject(ctx, projectCfg.Name, "Created by CDP")
 			if err != nil {
 				return fmt.Errorf("failed to create Coolify project %q: %w", projectCfg.Name, err)
 			}
@@ -183,14 +185,14 @@ func createProjectTask(client *api.Client, projectCfg *config.ProjectConfig) ui.
 	}
 }
 
-func setupEnvironmentTask(client *api.Client, projectCfg *config.ProjectConfig) ui.Task {
+func setupEnvironmentTask(ctx context.Context, client *api.Client, projectCfg *config.ProjectConfig) ui.Task {
 	return ui.Task{
 		Name:         "setup-env",
 		ActiveName:   "Setting up environment...",
 		CompleteName: "✓ Set up environment",
 		Action: func() error {
 			// Fetch project to check for auto-created environments
-			project, err := client.GetProject(projectCfg.ProjectUUID)
+			project, err := client.GetProject(ctx, projectCfg.ProjectUUID)
 			if err == nil {
 				for _, env := range project.Environments {
 					if strings.ToLower(env.Name) == "production" {
@@ -202,7 +204,7 @@ func setupEnvironmentTask(client *api.Client, projectCfg *config.ProjectConfig) 
 
 			// Create production environment if missing
 			if projectCfg.EnvironmentUUID == "" {
-				prodEnv, err := client.CreateEnvironment(projectCfg.ProjectUUID, "production")
+				prodEnv, err := client.CreateEnvironment(ctx, projectCfg.ProjectUUID, "production")
 				if err != nil {
 					return fmt.Errorf("failed to create production environment: %w", err)
 				}
@@ -214,14 +216,14 @@ func setupEnvironmentTask(client *api.Client, projectCfg *config.ProjectConfig) 
 	}
 }
 
-func checkEnvironmentTask(client *api.Client, projectCfg *config.ProjectConfig) ui.Task {
+func checkEnvironmentTask(ctx context.Context, client *api.Client, projectCfg *config.ProjectConfig) ui.Task {
 	return ui.Task{
 		Name:         "check-env",
 		ActiveName:   "Checking environment...",
 		CompleteName: "✓ Environment ready",
 		Action: func() error {
 			if projectCfg.EnvironmentUUID == "" {
-				project, err := client.GetProject(projectCfg.ProjectUUID)
+				project, err := client.GetProject(ctx, projectCfg.ProjectUUID)
 				if err == nil {
 					for _, env := range project.Environments {
 						if strings.ToLower(env.Name) == "production" {
@@ -233,7 +235,7 @@ func checkEnvironmentTask(client *api.Client, projectCfg *config.ProjectConfig) 
 
 				// Create if still missing
 				if projectCfg.EnvironmentUUID == "" {
-					prodEnv, err := client.CreateEnvironment(projectCfg.ProjectUUID, "production")
+					prodEnv, err := client.CreateEnvironment(ctx, projectCfg.ProjectUUID, "production")
 					if err != nil && !api.IsConflict(err) {
 						return err
 					}
@@ -271,7 +273,7 @@ func pushImageTask(globalCfg *config.GlobalConfig, projectCfg *config.ProjectCon
 	}
 }
 
-func createDockerAppTask(client *api.Client, projectCfg *config.ProjectConfig, tag string) ui.Task {
+func createDockerAppTask(ctx context.Context, client *api.Client, projectCfg *config.ProjectConfig, tag string) ui.Task {
 	return ui.Task{
 		Name:         "create-app",
 		ActiveName:   "Creating Coolify application...",
@@ -282,7 +284,7 @@ func createDockerAppTask(client *api.Client, projectCfg *config.ProjectConfig, t
 				port = config.DefaultPort
 			}
 
-			resp, err := client.CreateDockerImageApp(&api.CreateDockerImageAppRequest{
+			resp, err := client.CreateDockerImageApp(ctx, &api.CreateDockerImageAppRequest{
 				ProjectUUID:             projectCfg.ProjectUUID,
 				ServerUUID:              projectCfg.ServerUUID,
 				EnvironmentUUID:         projectCfg.EnvironmentUUID,
@@ -302,19 +304,19 @@ func createDockerAppTask(client *api.Client, projectCfg *config.ProjectConfig, t
 	}
 }
 
-func triggerDeploymentTask(client *api.Client, projectCfg *config.ProjectConfig, tag string) ui.Task {
+func triggerDeploymentTask(ctx context.Context, client *api.Client, projectCfg *config.ProjectConfig, tag string) ui.Task {
 	return ui.Task{
 		Name:         "trigger-deploy",
 		ActiveName:   "Triggering deployment...",
 		CompleteName: "✓ Triggered deployment",
 		Action: func() error {
-			if err := client.UpdateApplication(projectCfg.AppUUID, map[string]interface{}{
-				"docker_registry_image_tag": tag,
+			if err := client.UpdateApplication(ctx, projectCfg.AppUUID, api.UpdateApplicationRequest{
+				DockerRegistryImageTag: &tag,
 			}); err != nil {
 				return fmt.Errorf("failed to update application image tag: %w", err)
 			}
 
-			_, err := client.Deploy(projectCfg.AppUUID, false, 0)
+			_, err := client.Deploy(ctx, projectCfg.AppUUID, false, 0)
 			if err != nil {
 				return fmt.Errorf("failed to trigger deployment: %w", err)
 			}

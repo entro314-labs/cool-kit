@@ -68,20 +68,20 @@ func (c *SDKClient) CreateInstance(opts InstanceCreateOpts) (*InstanceInfo, erro
 		{
 			ResourceType: types.ResourceTypeInstance,
 			Tags: []types.Tag{
-				{Key: strPtr("Name"), Value: strPtr(opts.Name)},
-				{Key: strPtr("Application"), Value: strPtr("Coolify")},
-				{Key: strPtr("ManagedBy"), Value: strPtr("cool-kit")},
+				{Key: new("Name"), Value: new(opts.Name)},
+				{Key: new("Application"), Value: new("Coolify")},
+				{Key: new("ManagedBy"), Value: new("cool-kit")},
 			},
 		},
 	}
 
 	// Build input
 	input := &ec2.RunInstancesInput{
-		ImageId:           strPtr(opts.AMI),
+		ImageId:           new(opts.AMI),
 		InstanceType:      types.InstanceType(opts.InstanceType),
-		MinCount:          int32Ptr(1),
-		MaxCount:          int32Ptr(1),
-		KeyName:           strPtr(opts.KeyName),
+		MinCount:          new(int32(1)),
+		MaxCount:          new(int32(1)),
+		KeyName:           new(opts.KeyName),
 		TagSpecifications: tags,
 	}
 
@@ -92,16 +92,16 @@ func (c *SDKClient) CreateInstance(opts InstanceCreateOpts) (*InstanceInfo, erro
 
 	// Add subnet if provided
 	if opts.SubnetID != "" {
-		input.SubnetId = strPtr(opts.SubnetID)
+		input.SubnetId = new(opts.SubnetID)
 	}
 
 	// Add block device mapping for disk size
 	if opts.DiskSizeGB > 0 {
 		input.BlockDeviceMappings = []types.BlockDeviceMapping{
 			{
-				DeviceName: strPtr("/dev/sda1"),
+				DeviceName: new("/dev/sda1"),
 				Ebs: &types.EbsBlockDevice{
-					VolumeSize: int32Ptr(opts.DiskSizeGB),
+					VolumeSize: new(opts.DiskSizeGB),
 					VolumeType: types.VolumeTypeGp3,
 				},
 			},
@@ -110,7 +110,7 @@ func (c *SDKClient) CreateInstance(opts InstanceCreateOpts) (*InstanceInfo, erro
 
 	// Add user data if provided
 	if opts.UserData != "" {
-		input.UserData = strPtr(opts.UserData)
+		input.UserData = new(opts.UserData)
 	}
 
 	// Run instance
@@ -157,11 +157,11 @@ func (c *SDKClient) GetCoolifyInstance() (*InstanceInfo, error) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
 			{
-				Name:   strPtr("tag:Application"),
+				Name:   new("tag:Application"),
 				Values: []string{"Coolify"},
 			},
 			{
-				Name:   strPtr("instance-state-name"),
+				Name:   new("instance-state-name"),
 				Values: []string{"running", "pending", "stopping", "stopped"},
 			},
 		},
@@ -220,8 +220,8 @@ func (c *SDKClient) AllocateElasticIP(instanceID string) (string, error) {
 			{
 				ResourceType: types.ResourceTypeElasticIp,
 				Tags: []types.Tag{
-					{Key: strPtr("Application"), Value: strPtr("Coolify")},
-					{Key: strPtr("ManagedBy"), Value: strPtr("cool-kit")},
+					{Key: new("Application"), Value: new("Coolify")},
+					{Key: new("ManagedBy"), Value: new("cool-kit")},
 				},
 			},
 		},
@@ -233,7 +233,7 @@ func (c *SDKClient) AllocateElasticIP(instanceID string) (string, error) {
 	// Associate with instance
 	_, err = c.ec2.AssociateAddress(c.ctx, &ec2.AssociateAddressInput{
 		AllocationId: allocResult.AllocationId,
-		InstanceId:   strPtr(instanceID),
+		InstanceId:   new(instanceID),
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to associate Elastic IP: %w", err)
@@ -287,12 +287,14 @@ func instanceToInfo(instance *types.Instance) *InstanceInfo {
 	return info
 }
 
+//go:fix inline
 func strPtr(s string) *string {
-	return &s
+	return new(s)
 }
 
+//go:fix inline
 func int32Ptr(i int32) *int32 {
-	return &i
+	return new(i)
 }
 
 func safeString(s *string) string {

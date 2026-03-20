@@ -25,11 +25,11 @@ func NewMCPServer(client *api.Client) *MCPServer {
 }
 
 // Start starts the MCP server, listening on stdin for JSON-RPC 2.0 messages
-func (s *MCPServer) Start() error {
+func (s *MCPServer) Start(ctx context.Context) error {
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if err := s.handleMessage(line); err != nil {
+		if err := s.handleMessage(ctx, line); err != nil {
 			log.Printf("Error handling message: %v", err)
 		}
 	}
@@ -37,282 +37,297 @@ func (s *MCPServer) Start() error {
 }
 
 // handleMessage processes a JSON-RPC 2.0 message
-func (s *MCPServer) handleMessage(msg string) error {
-	var req map[string]interface{}
+func (s *MCPServer) handleMessage(ctx context.Context, msg string) error {
+	var req JsonRpcRequest
 	if err := json.Unmarshal([]byte(msg), &req); err != nil {
-		return s.sendError(-32700, "Parse error", nil)
+		return s.sendError(nil, ParseError, "Parse error", nil)
 	}
 
-	id, ok := req["id"].(float64)
-	if !ok {
-		// id is optional or might be missing, but for JSON-RPC usually required for request/response matching
-		// We'll proceed with 0 if missing/invalid, assuming notification or we can't reply properly anyway
-	}
-	method, ok := req["method"].(string)
-	if !ok {
-		return s.sendError(int(id), "Invalid Request", nil)
+	// Validate request
+	if req.JSONRPC != "2.0" {
+		// Valid JSON-RPC 2.0 but wrong version, still treat as valid request format for error reporting
+		return s.sendError(req.ID, InvalidRequest, "Invalid JSON-RPC version", nil)
 	}
 
-	switch method {
+	switch req.Method {
 	case "initialize":
-		return s.handleInitialize(id)
+		return s.handleInitialize(req.ID)
 	case "tools/list":
-		return s.handleToolsList(id)
+		return s.handleToolsList(req.ID)
 	case "tools/call":
-		return s.handleToolsCall(id, req)
+		return s.handleToolsCall(ctx, req.ID, req.Params)
 	default:
-		return s.sendError(int(id), "Method not found", method)
+		return s.sendError(req.ID, MethodNotFound, "Method not found", req.Method)
 	}
 }
 
 // handleInitialize handles the MCP initialize request
-func (s *MCPServer) handleInitialize(id float64) error {
-	response := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      id,
-		"result": map[string]interface{}{
-			"protocolVersion": "2024-11-05",
-			"capabilities": map[string]interface{}{
-				"tools": map[string]interface{}{},
-			},
-			"serverInfo": map[string]interface{}{
-				"name":    "cool-kit-mcp",
-				"version": "1.0.0",
-			},
+func (s *MCPServer) handleInitialize(id *json.Number) error {
+	result := InitializeResult{
+		ProtocolVersion: "2024-11-05",
+		Capabilities: Capabilities{
+			Tools: map[string]any{}, // Empty map as required by spec if supporting tools
+		},
+		ServerInfo: ServerInfo{
+			Name:    "cool-kit-mcp",
+			Version: "1.0.0",
 		},
 	}
-	return s.sendResponse(response)
+
+	return s.sendResponse(id, result)
 }
 
 // handleToolsList returns the list of available MCP tools
-func (s *MCPServer) handleToolsList(id float64) error {
-	tools := []map[string]interface{}{
+func (s *MCPServer) handleToolsList(id *json.Number) error {
+	tools := []ToolDefinition{
 		{
-			"name":        "list_applications",
-			"description": "List all Coolify applications with their UUIDs and names",
-			"inputSchema": map[string]interface{}{
-				"type":       "object",
-				"properties": map[string]interface{}{},
+			Name:        "list_applications",
+			Description: "List all Coolify applications with their UUIDs and names",
+			InputSchema: ToolSchema{
+				Type:       "object",
+				Properties: map[string]any{},
 			},
 		},
 		{
-			"name":        "get_application",
-			"description": "Get details of a specific Coolify application by UUID",
-			"inputSchema": map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"uuid": map[string]interface{}{
+			Name:        "get_application",
+			Description: "Get details of a specific Coolify application by UUID",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"uuid": map[string]any{
 						"type":        "string",
 						"description": "Application UUID",
 					},
 				},
-				"required": []string{"uuid"},
+				Required: []string{"uuid"},
 			},
 		},
 		{
-			"name":        "get_application_logs",
-			"description": "Retrieve logs for a Coolify application for debugging purposes",
-			"inputSchema": map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"uuid": map[string]interface{}{
+			Name:        "get_application_logs",
+			Description: "Retrieve logs for a Coolify application for debugging purposes",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"uuid": map[string]any{
 						"type":        "string",
 						"description": "Application UUID",
 					},
-					"lines": map[string]interface{}{
+					"lines": map[string]any{
 						"type":        "integer",
 						"description": "Number of lines to retrieve (default: 100)",
 					},
-					"grep_text": map[string]interface{}{
+					"grep_text": map[string]any{
 						"type":        "string",
 						"description": "Text to filter/grep in logs",
 					},
 				},
-				"required": []string{"uuid"},
+				Required: []string{"uuid"},
 			},
 		},
 		{
-			"name":        "start_application",
-			"description": "Start a Coolify application",
-			"inputSchema": map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"uuid": map[string]interface{}{
+			Name:        "start_application",
+			Description: "Start a Coolify application",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"uuid": map[string]any{
 						"type":        "string",
 						"description": "Application UUID",
 					},
 				},
-				"required": []string{"uuid"},
+				Required: []string{"uuid"},
 			},
 		},
 		{
-			"name":        "stop_application",
-			"description": "Stop a Coolify application",
-			"inputSchema": map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"uuid": map[string]interface{}{
+			Name:        "stop_application",
+			Description: "Stop a Coolify application",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"uuid": map[string]any{
 						"type":        "string",
 						"description": "Application UUID",
 					},
 				},
-				"required": []string{"uuid"},
+				Required: []string{"uuid"},
 			},
 		},
 		{
-			"name":        "restart_application",
-			"description": "Restart a Coolify application",
-			"inputSchema": map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"uuid": map[string]interface{}{
+			Name:        "restart_application",
+			Description: "Restart a Coolify application",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"uuid": map[string]any{
 						"type":        "string",
 						"description": "Application UUID",
 					},
 				},
-				"required": []string{"uuid"},
+				Required: []string{"uuid"},
 			},
 		},
 		{
-			"name":        "deploy_application",
-			"description": "Trigger a deployment for a Coolify application",
-			"inputSchema": map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"uuid": map[string]interface{}{
+			Name:        "deploy_application",
+			Description: "Trigger a deployment for a Coolify application",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"uuid": map[string]any{
 						"type":        "string",
 						"description": "Application UUID",
 					},
-					"force": map[string]interface{}{
+					"force": map[string]any{
 						"type":        "boolean",
 						"description": "Force rebuild without cache",
 					},
 				},
-				"required": []string{"uuid"},
+				Required: []string{"uuid"},
 			},
 		},
 		{
-			"name":        "list_deployments",
-			"description": "List deployments for a Coolify application",
-			"inputSchema": map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"app_uuid": map[string]interface{}{
+			Name:        "list_deployments",
+			Description: "List deployments for a Coolify application",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"app_uuid": map[string]any{
 						"type":        "string",
 						"description": "Application UUID",
 					},
 				},
-				"required": []string{"app_uuid"},
+				Required: []string{"app_uuid"},
 			},
 		},
 		{
-			"name":        "get_deployment",
-			"description": "Get details and logs of a specific deployment",
-			"inputSchema": map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"deployment_uuid": map[string]interface{}{
+			Name:        "get_deployment",
+			Description: "Get details and logs of a specific deployment",
+			InputSchema: ToolSchema{
+				Type: "object",
+				Properties: map[string]any{
+					"deployment_uuid": map[string]any{
 						"type":        "string",
 						"description": "Deployment UUID",
 					},
 				},
-				"required": []string{"deployment_uuid"},
+				Required: []string{"deployment_uuid"},
 			},
 		},
 	}
 
-	response := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      id,
-		"result": map[string]interface{}{
-			"tools": tools,
-		},
+	result := ToolListResult{
+		Tools: tools,
 	}
-	return s.sendResponse(response)
+	return s.sendResponse(id, result)
 }
 
 // handleToolsCall dispatches tool calls to the appropriate handler
-func (s *MCPServer) handleToolsCall(id float64, req map[string]interface{}) error {
-	params, ok := req["params"].(map[string]interface{})
-	if !ok {
-		// params are optional
-		params = make(map[string]interface{})
-	}
-	name, ok := params["name"].(string)
-	if !ok {
-		return s.sendError(int(id), "Invalid tool name", nil)
-	}
-	args, ok := params["arguments"].(map[string]interface{})
-	if !ok {
-		args = make(map[string]interface{})
+func (s *MCPServer) handleToolsCall(ctx context.Context, id *json.Number, paramsRaw json.RawMessage) error {
+	var params ToolCallParams
+	if err := json.Unmarshal(paramsRaw, &params); err != nil {
+		return s.sendError(id, InvalidParams, "Invalid params definition", nil)
 	}
 
-	var result interface{}
+	var result any
 	var err error
 
-	switch name {
+	switch params.Name {
 	case "list_applications":
-		result, err = s.listApplications()
+		result, err = s.listApplications(ctx)
 	case "get_application":
-		result, err = s.getApplication(args)
+		var args BaseArgs
+		if jsonErr := json.Unmarshal(params.Arguments, &args); jsonErr != nil {
+			return s.sendError(id, InvalidParams, "Invalid arguments", nil)
+		}
+		result, err = s.getApplication(ctx, args)
 	case "get_application_logs":
-		result, err = s.getApplicationLogs(args)
+		var args GetLogsArgs
+		if jsonErr := json.Unmarshal(params.Arguments, &args); jsonErr != nil {
+			return s.sendError(id, InvalidParams, "Invalid arguments", nil)
+		}
+		result, err = s.getApplicationLogs(ctx, args)
 	case "start_application":
-		result, err = s.startApplication(args)
+		var args BaseArgs
+		if jsonErr := json.Unmarshal(params.Arguments, &args); jsonErr != nil {
+			return s.sendError(id, InvalidParams, "Invalid arguments", nil)
+		}
+		result, err = s.startApplication(ctx, args)
 	case "stop_application":
-		result, err = s.stopApplication(args)
+		var args BaseArgs
+		if jsonErr := json.Unmarshal(params.Arguments, &args); jsonErr != nil {
+			return s.sendError(id, InvalidParams, "Invalid arguments", nil)
+		}
+		result, err = s.stopApplication(ctx, args)
 	case "restart_application":
-		result, err = s.restartApplication(args)
+		var args BaseArgs
+		if jsonErr := json.Unmarshal(params.Arguments, &args); jsonErr != nil {
+			return s.sendError(id, InvalidParams, "Invalid arguments", nil)
+		}
+		result, err = s.restartApplication(ctx, args)
 	case "deploy_application":
-		result, err = s.deployApplication(args)
+		var args DeployAppArgs
+		if jsonErr := json.Unmarshal(params.Arguments, &args); jsonErr != nil {
+			return s.sendError(id, InvalidParams, "Invalid arguments", nil)
+		}
+		result, err = s.deployApplication(ctx, args)
 	case "list_deployments":
-		result, err = s.listDeployments(args)
+		var args BaseAppArgs
+		if jsonErr := json.Unmarshal(params.Arguments, &args); jsonErr != nil {
+			return s.sendError(id, InvalidParams, "Invalid arguments", nil)
+		}
+		result, err = s.listDeployments(ctx, args)
 	case "get_deployment":
-		result, err = s.getDeployment(args)
+		var args GetDeploymentArgs
+		if jsonErr := json.Unmarshal(params.Arguments, &args); jsonErr != nil {
+			return s.sendError(id, InvalidParams, "Invalid arguments", nil)
+		}
+		result, err = s.getDeployment(ctx, args)
 	default:
-		return s.sendError(int(id), "Tool not found", name)
+		return s.sendError(id, MethodNotFound, "Tool not found", params.Name)
 	}
 
 	if err != nil {
-		return s.sendError(int(id), err.Error(), nil)
+		// Return application error as a tool error result rather than JSON-RPC error
+		// This allows the model to see the error output
+		return s.sendToolResult(id, fmt.Sprintf("Error: %v", err), true)
 	}
 
-	// Format result as text content
-	resultText, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		resultText = []byte(fmt.Sprintf("%v", result))
+	// Format result as text content for the tool result
+	resultText, jsonErr := json.MarshalIndent(result, "", "  ")
+	if jsonErr != nil {
+		resultText = fmt.Appendf(nil, "%v", result)
 	}
 
-	response := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      id,
-		"result": map[string]interface{}{
-			"content": []map[string]interface{}{
-				{
-					"type": "text",
-					"text": string(resultText),
-				},
+	return s.sendToolResult(id, string(resultText), false)
+}
+
+func (s *MCPServer) sendToolResult(id *json.Number, text string, isError bool) error {
+	result := CallToolResult{
+		Content: []ContentItem{
+			{
+				Type: "text",
+				Text: text,
 			},
 		},
+		IsError: isError,
 	}
-	return s.sendResponse(response)
+	return s.sendResponse(id, result)
 }
 
 // Tool implementations
 
-func (s *MCPServer) listApplications() (interface{}, error) {
-	apps, err := s.client.ListApplications()
+func (s *MCPServer) listApplications(ctx context.Context) (any, error) {
+	apps, err := s.client.ListApplications(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var result []map[string]interface{}
+	var result []map[string]any
 	for _, app := range apps {
 		var fqdn string
 		if app.Fqdn != nil {
 			fqdn = *app.Fqdn
 		}
-		result = append(result, map[string]interface{}{
+		result = append(result, map[string]any{
 			"uuid":   app.UUID,
 			"name":   app.Name,
 			"status": app.Status,
@@ -322,16 +337,12 @@ func (s *MCPServer) listApplications() (interface{}, error) {
 	return result, nil
 }
 
-func (s *MCPServer) getApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, ok := args["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("uuid is required")
-	}
-	if uuid == "" {
+func (s *MCPServer) getApplication(ctx context.Context, args BaseArgs) (any, error) {
+	if args.UUID == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
 
-	app, err := s.client.GetApplication(uuid)
+	app, err := s.client.GetApplication(ctx, args.UUID)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +352,7 @@ func (s *MCPServer) getApplication(args map[string]interface{}) (interface{}, er
 		fqdn = *app.Fqdn
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"uuid":       app.UUID,
 		"name":       app.Name,
 		"status":     app.Status,
@@ -351,21 +362,17 @@ func (s *MCPServer) getApplication(args map[string]interface{}) (interface{}, er
 	}, nil
 }
 
-func (s *MCPServer) getApplicationLogs(args map[string]interface{}) (interface{}, error) {
-	uuid, ok := args["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("uuid is required")
-	}
-	if uuid == "" {
+func (s *MCPServer) getApplicationLogs(ctx context.Context, args GetLogsArgs) (any, error) {
+	if args.UUID == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
 
-	lines := 100
-	if l, ok := args["lines"].(float64); ok {
-		lines = int(l)
+	lines := args.Lines
+	if lines <= 0 {
+		lines = 100
 	}
 
-	logs, err := s.client.GetApplicationLogs(context.Background(), uuid, lines)
+	logs, err := s.client.GetApplicationLogs(ctx, args.UUID, lines)
 	if err != nil {
 		return nil, err
 	}
@@ -373,97 +380,76 @@ func (s *MCPServer) getApplicationLogs(args map[string]interface{}) (interface{}
 	logText := logs.Logs
 
 	// Apply grep filter if specified
-	if grepText, ok := args["grep_text"].(string); ok && grepText != "" {
+	if args.GrepText != "" {
 		logLines := strings.Split(logText, "\n")
 		var filteredLines []string
 		for _, line := range logLines {
-			if strings.Contains(line, grepText) {
+			if strings.Contains(line, args.GrepText) {
 				filteredLines = append(filteredLines, line)
 			}
 		}
 		logText = strings.Join(filteredLines, "\n")
 	}
 
-	return map[string]interface{}{
-		"uuid": uuid,
+	return map[string]any{
+		"uuid": args.UUID,
 		"logs": logText,
 	}, nil
 }
 
-func (s *MCPServer) startApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, ok := args["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("uuid is required")
-	}
-	if uuid == "" {
+func (s *MCPServer) startApplication(ctx context.Context, args BaseArgs) (any, error) {
+	if args.UUID == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
 
-	resp, err := s.client.StartApplication(context.Background(), uuid, false, false)
+	resp, err := s.client.StartApplication(ctx, args.UUID, false, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"message":         resp.Message,
 		"deployment_uuid": resp.DeploymentUUID,
 	}, nil
 }
 
-func (s *MCPServer) stopApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, ok := args["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("uuid is required")
-	}
-	if uuid == "" {
+func (s *MCPServer) stopApplication(ctx context.Context, args BaseArgs) (any, error) {
+	if args.UUID == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
 
-	resp, err := s.client.StopApplication(context.Background(), uuid)
+	resp, err := s.client.StopApplication(ctx, args.UUID)
 	if err != nil {
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"message": resp.Message,
 	}, nil
 }
 
-func (s *MCPServer) restartApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, ok := args["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("uuid is required")
-	}
-	if uuid == "" {
+func (s *MCPServer) restartApplication(ctx context.Context, args BaseArgs) (any, error) {
+	if args.UUID == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
 
-	resp, err := s.client.RestartApplication(context.Background(), uuid)
+	resp, err := s.client.RestartApplication(ctx, args.UUID)
 	if err != nil {
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"message":         resp.Message,
 		"deployment_uuid": resp.DeploymentUUID,
 	}, nil
 }
 
-func (s *MCPServer) deployApplication(args map[string]interface{}) (interface{}, error) {
-	uuid, ok := args["uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("uuid is required")
-	}
-	if uuid == "" {
+func (s *MCPServer) deployApplication(ctx context.Context, args DeployAppArgs) (any, error) {
+	if args.UUID == "" {
 		return nil, fmt.Errorf("uuid is required")
 	}
 
-	force := false
-	if f, ok := args["force"].(bool); ok {
-		force = f
-	}
-
-	resp, err := s.client.Deploy(uuid, force, 0)
+	resp, err := s.client.Deploy(ctx, args.UUID, args.Force, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -475,29 +461,25 @@ func (s *MCPServer) deployApplication(args map[string]interface{}) (interface{},
 		deploymentUUID = resp.Deployments[0].DeploymentUUID
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"message":         message,
 		"deployment_uuid": deploymentUUID,
 	}, nil
 }
 
-func (s *MCPServer) listDeployments(args map[string]interface{}) (interface{}, error) {
-	appUUID, ok := args["app_uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("app_uuid must be a string")
-	}
-	if appUUID == "" {
+func (s *MCPServer) listDeployments(ctx context.Context, args BaseAppArgs) (any, error) {
+	if args.AppUUID == "" {
 		return nil, fmt.Errorf("app_uuid is required")
 	}
 
-	deployments, err := s.client.ListDeployments(appUUID)
+	deployments, err := s.client.ListDeployments(ctx, args.AppUUID)
 	if err != nil {
 		return nil, err
 	}
 
-	var result []map[string]interface{}
+	var result []map[string]any
 	for _, d := range deployments {
-		result = append(result, map[string]interface{}{
+		result = append(result, map[string]any{
 			"uuid":            d.UUID,
 			"deployment_uuid": d.DeploymentUUID,
 			"status":          d.Status,
@@ -509,16 +491,12 @@ func (s *MCPServer) listDeployments(args map[string]interface{}) (interface{}, e
 	return result, nil
 }
 
-func (s *MCPServer) getDeployment(args map[string]interface{}) (interface{}, error) {
-	deploymentUUID, ok := args["deployment_uuid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("deployment_uuid must be a string")
-	}
-	if deploymentUUID == "" {
+func (s *MCPServer) getDeployment(ctx context.Context, args GetDeploymentArgs) (any, error) {
+	if args.DeploymentUUID == "" {
 		return nil, fmt.Errorf("deployment_uuid is required")
 	}
 
-	deployment, err := s.client.GetDeployment(deploymentUUID)
+	deployment, err := s.client.GetDeployment(ctx, args.DeploymentUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -526,7 +504,7 @@ func (s *MCPServer) getDeployment(args map[string]interface{}) (interface{}, err
 	// Parse logs for readability
 	parsedLogs := api.ParseLogs(deployment.Logs)
 
-	return map[string]interface{}{
+	return map[string]any{
 		"deployment_uuid":  deployment.DeploymentUUID,
 		"status":           deployment.Status,
 		"application_name": deployment.ApplicationName,
@@ -539,7 +517,13 @@ func (s *MCPServer) getDeployment(args map[string]interface{}) (interface{}, err
 }
 
 // sendResponse sends a JSON-RPC 2.0 response to stdout
-func (s *MCPServer) sendResponse(response map[string]interface{}) error {
+func (s *MCPServer) sendResponse(id *json.Number, result any) error {
+	response := JsonRpcResponse{
+		JSONRPC: "2.0",
+		ID:      id,
+		Result:  result,
+	}
+
 	data, err := json.Marshal(response)
 	if err != nil {
 		return err
@@ -549,17 +533,21 @@ func (s *MCPServer) sendResponse(response map[string]interface{}) error {
 }
 
 // sendError sends a JSON-RPC 2.0 error response
-func (s *MCPServer) sendError(id int, message string, data interface{}) error {
-	response := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      id,
-		"error": map[string]interface{}{
-			"code":    -32601,
-			"message": message,
+func (s *MCPServer) sendError(id *json.Number, code int, message string, data any) error {
+	response := JsonRpcResponse{
+		JSONRPC: "2.0",
+		ID:      id,
+		Error: &JsonRpcError{
+			Code:    code,
+			Message: message,
+			Data:    data,
 		},
 	}
-	if data != nil {
-		response["error"].(map[string]interface{})["data"] = data
+
+	dataBytes, err := json.Marshal(response)
+	if err != nil {
+		return err
 	}
-	return s.sendResponse(response)
+	fmt.Println(string(dataBytes))
+	return nil
 }

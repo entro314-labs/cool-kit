@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/entro314-labs/cool-kit/internal/service"
@@ -25,7 +24,7 @@ var githubListCmd = &cobra.Command{
 		}
 
 		svc := service.NewGitHubAppService(client)
-		apps, err := svc.List(context.Background())
+		apps, err := svc.List(cmd.Context())
 		if err != nil {
 			return err
 		}
@@ -46,7 +45,7 @@ var githubGetCmd = &cobra.Command{
 		}
 
 		svc := service.NewGitHubAppService(client)
-		app, err := svc.Get(context.Background(), args[0])
+		app, err := svc.Get(cmd.Context(), args[0])
 		if err != nil {
 			return err
 		}
@@ -67,7 +66,7 @@ var githubReposCmd = &cobra.Command{
 		}
 
 		svc := service.NewGitHubAppService(client)
-		repos, err := svc.ListRepositories(context.Background(), args[0])
+		repos, err := svc.ListRepositories(cmd.Context(), args[0])
 		if err != nil {
 			return err
 		}
@@ -100,7 +99,7 @@ var githubBranchesCmd = &cobra.Command{
 		}
 
 		svc := service.NewGitHubAppService(client)
-		branches, err := svc.ListBranches(context.Background(), args[0], owner, repo)
+		branches, err := svc.ListBranches(cmd.Context(), args[0], owner, repo)
 		if err != nil {
 			return err
 		}
@@ -128,13 +127,13 @@ var githubDeleteCmd = &cobra.Command{
 			var confirm string
 			fmt.Scanln(&confirm)
 			if confirm != "yes" {
-				fmt.Println("Cancelled")
+				fmt.Println("Canceled")
 				return nil
 			}
 		}
 
 		svc := service.NewGitHubAppService(client)
-		if err := svc.Delete(context.Background(), args[0]); err != nil {
+		if err := svc.Delete(cmd.Context(), args[0]); err != nil {
 			return err
 		}
 

@@ -48,7 +48,7 @@ func runHealth(cmd *cobra.Command, args []string) error {
 		allHealthy = false
 	} else {
 		client := api.NewClient(cfg.CoolifyURL, cfg.CoolifyToken)
-		if err := client.HealthCheck(); err != nil {
+		if err := client.HealthCheck(cmd.Context()); err != nil {
 			checks = append(checks, check{
 				name:   "Coolify",
 				status: "Connection failed",

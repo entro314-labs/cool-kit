@@ -4,9 +4,57 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+type KeyMap struct {
+	Up      key.Binding
+	Down    key.Binding
+	Left    key.Binding
+	Right   key.Binding
+	Select  key.Binding
+	Quit    key.Binding
+	Install key.Binding
+	Deploy  key.Binding
+	Help    key.Binding
+}
+
+var Keys = KeyMap{
+	Up: key.NewBinding(
+		key.WithKeys("up", "k"),
+		key.WithHelp("↑/k", "move up"),
+	),
+	Down: key.NewBinding(
+		key.WithKeys("down", "j"),
+		key.WithHelp("↓/j", "move down"),
+	),
+	Left: key.NewBinding(
+		key.WithKeys("left", "h", "shift+tab"),
+		key.WithHelp("←/h", "previous section"),
+	),
+	Right: key.NewBinding(
+		key.WithKeys("right", "l", "tab"),
+		key.WithHelp("→/l", "next section"),
+	),
+	Select: key.NewBinding(
+		key.WithKeys("enter", " "),
+		key.WithHelp("enter/space", "select"),
+	),
+	Quit: key.NewBinding(
+		key.WithKeys("q", "esc", "ctrl+c"),
+		key.WithHelp("q/esc", "quit"),
+	),
+	Install: key.NewBinding(
+		key.WithKeys("1"),
+		key.WithHelp("1", "install"),
+	),
+	Deploy: key.NewBinding(
+		key.WithKeys("2"),
+		key.WithHelp("2", "deploy"),
+	),
+}
 
 // MainMenuState represents the state of the main menu
 type MainMenuState int
@@ -210,23 +258,19 @@ func (m MainMenuModel) Init() tea.Cmd {
 func (m MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q", "esc":
+		switch {
+		case key.Matches(msg, Keys.Quit):
 			m.selected = SelectionExit
 			return m, tea.Quit
-		case "up", "k":
+		case key.Matches(msg, Keys.Up):
 			if m.cursor > 0 {
 				m.cursor--
 			}
-		case "down", "j":
+		case key.Matches(msg, Keys.Down):
 			if m.cursor < len(m.flatChoices)-1 {
 				m.cursor++
 			}
-		case "home", "g":
-			m.cursor = 0
-		case "end", "G":
-			m.cursor = len(m.flatChoices) - 1
-		case "tab", "right", "l":
+		case key.Matches(msg, Keys.Right):
 			// Jump to next section
 			for i, bound := range m.sectionBounds {
 				if bound > m.cursor && i < len(m.sectionBounds) {
@@ -234,7 +278,7 @@ func (m MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-		case "shift+tab", "left", "h":
+		case key.Matches(msg, Keys.Left):
 			// Jump to previous section
 			for i := len(m.sectionBounds) - 1; i >= 0; i-- {
 				if m.sectionBounds[i] < m.cursor {
@@ -242,13 +286,13 @@ func (m MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-		case "enter", " ":
+		case key.Matches(msg, Keys.Select):
 			m.selected = m.flatChoices[m.cursor].Selection
 			return m, tea.Quit
-		case "1":
+		case key.Matches(msg, Keys.Install):
 			m.selected = SelectionInstall
 			return m, tea.Quit
-		case "2":
+		case key.Matches(msg, Keys.Deploy):
 			m.selected = SelectionDeploy
 			return m, tea.Quit
 		}
@@ -312,13 +356,7 @@ func (m MainMenuModel) View() string {
 	var s strings.Builder
 
 	// Calculate layout dimensions
-	totalWidth := m.width
-	if totalWidth < 80 {
-		totalWidth = 80
-	}
-	if totalWidth > 110 {
-		totalWidth = 110
-	}
+	totalWidth := min(max(m.width, 80), 110)
 
 	// Header - spans full width, horizontally centered
 	header := logoStyle.Render("🧊 COOL KIT") + "  " + taglineStyle.Render("The Complete Coolify Toolkit")
@@ -328,13 +366,11 @@ func (m MainMenuModel) View() string {
 
 	// Calculate column widths for 3-column layout (narrower columns)
 	colGap := 2
-	colWidth := (totalWidth - colGap*2) / 4 // Narrower: divide by 4 instead of 3
-	if colWidth < 22 {
-		colWidth = 22
-	}
-	if colWidth > 28 {
-		colWidth = 28
-	}
+	colWidth := min(
+		// Narrower: divide by 4 instead of 3
+		max(
+
+			(totalWidth-colGap*2)/4, 22), 28)
 
 	// Left column: Deploy Coolify + Deploy Apps
 	leftCol := m.renderSection(0, colWidth)

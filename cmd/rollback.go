@@ -61,7 +61,7 @@ func runRollback(cmd *cobra.Command, args []string) error {
 
 	// List recent deployments
 	ui.Info("Fetching deployment history...")
-	deployments, err := client.ListDeployments(appUUID)
+	deployments, err := client.ListDeployments(cmd.Context(), appUUID)
 	if err != nil {
 		ui.Error("Failed to fetch deployments")
 		return fmt.Errorf("failed to fetch deployments: %w", err)
@@ -151,7 +151,7 @@ func runRollback(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !confirmed {
-		ui.Dim("Cancelled")
+		ui.Dim("Canceled")
 		return nil
 	}
 
@@ -160,8 +160,8 @@ func runRollback(cmd *cobra.Command, args []string) error {
 	// Trigger rollback
 	ui.Info("Initiating rollback...")
 	if selectedDeployment.GitCommitSha != "" {
-		err = client.UpdateApplication(appUUID, map[string]any{
-			"git_commit_sha": selectedDeployment.GitCommitSha,
+		err = client.UpdateApplication(cmd.Context(), appUUID, api.UpdateApplicationRequest{
+			GitCommitSHA: &selectedDeployment.GitCommitSha,
 		})
 		if err != nil {
 			ui.Error("Failed to update application")
@@ -170,7 +170,7 @@ func runRollback(cmd *cobra.Command, args []string) error {
 	}
 
 	// Deploy with PR 0 (production)
-	_, err = client.Deploy(appUUID, true, 0)
+	_, err = client.Deploy(cmd.Context(), appUUID, true, 0)
 	if err != nil {
 		ui.Error("Failed to trigger deployment")
 		return fmt.Errorf("rollback failed: %w", err)

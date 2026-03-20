@@ -1,6 +1,9 @@
 package api
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Server represents a Coolify server (enhanced from CAGC)
 type Server struct {
@@ -371,4 +374,97 @@ type Destination struct {
 	ResourceCount int    `json:"resource_count,omitempty"`
 	CreatedAt     string `json:"created_at,omitempty"`
 	UpdatedAt     string `json:"updated_at,omitempty"`
+}
+
+// BaseConfig contains common configuration fields for services and databases
+type BaseConfig struct {
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	ProjectUUID     string `json:"project_uuid"`
+	EnvironmentName string `json:"environment_name"`
+	ServerUUID      string `json:"server_uuid"`
+	Type            string `json:"type"`
+	Image           string `json:"image"`
+	IsPublic        bool   `json:"is_public"`
+}
+
+// PostgresConfig configuration for PostgreSQL
+type PostgresConfig struct {
+	BaseConfig
+	PostgresDB       string `json:"postgres_db"`
+	PostgresUser     string `json:"postgres_user"`
+	PostgresPassword string `json:"postgres_password"`
+}
+
+// MySQLConfig configuration for MySQL
+type MySQLConfig struct {
+	BaseConfig
+	MySQLDatabase     string `json:"mysql_database"`
+	MySQLUser         string `json:"mysql_user"`
+	MySQLPassword     string `json:"mysql_password"`
+	MySQLRootPassword string `json:"mysql_root_password"`
+}
+
+// MongoDBConfig configuration for MongoDB
+type MongoDBConfig struct {
+	BaseConfig
+	MongoRootUser     string `json:"mongo_initdb_root_username"`
+	MongoRootPassword string `json:"mongo_initdb_root_password"`
+}
+
+// RedisConfig configuration for Redis
+type RedisConfig struct {
+	BaseConfig
+	RedisPassword string `json:"redis_password"`
+}
+
+// ServiceConfig configuration for services like Meilisearch/Elasticsearch
+type ServiceConfig struct {
+	BaseConfig
+	EnvironmentVariables map[string]string `json:"environment_variables"`
+}
+
+// ID handles potentially mixed ID types (int/string) from Coolify API
+type ID string
+
+func (id *ID) UnmarshalJSON(data []byte) error {
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	switch val := v.(type) {
+	case string:
+		*id = ID(val)
+	case float64:
+		*id = ID(fmt.Sprintf("%.0f", val))
+	case int:
+		*id = ID(fmt.Sprintf("%d", val))
+	default:
+		return fmt.Errorf("invalid type for ID: %T", val)
+	}
+	return nil
+}
+
+// UpdateApplicationRequest body for updating an application
+type UpdateApplicationRequest struct {
+	Name                    *string `json:"name,omitempty"`
+	Description             *string `json:"description,omitempty"`
+	Domains                 *string `json:"domains,omitempty"`
+	DockerRegistryImageName *string `json:"docker_registry_image_name,omitempty"`
+	DockerRegistryImageTag  *string `json:"docker_registry_image_tag,omitempty"`
+	PortsExposes            *string `json:"ports_exposes,omitempty"`
+	GitCommitSHA            *string `json:"git_commit_sha,omitempty"`
+}
+
+// UpdateDatabaseRequest body for updating a database
+type UpdateDatabaseRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	IsPublic    *bool   `json:"is_public,omitempty"`
+}
+
+// UpdateServiceRequest body for updating a generic service
+type UpdateServiceRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
 }

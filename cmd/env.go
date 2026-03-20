@@ -99,7 +99,7 @@ func runEnvLs(cmd *cobra.Command, args []string) error {
 	ui.Section("Environment Variables")
 
 	ui.Info("Loading environment variables...")
-	allEnvVars, err := client.GetApplicationEnvVars(appUUID)
+	allEnvVars, err := client.GetApplicationEnvVars(cmd.Context(), appUUID)
 	if err != nil {
 		ui.Error("Failed to load environment variables")
 		return fmt.Errorf("failed to fetch environment variables: %w", err)
@@ -168,7 +168,7 @@ func runEnvAdd(cmd *cobra.Command, args []string) error {
 	isPreview := !prodFlag
 
 	ui.Info(fmt.Sprintf("Adding %s...", key))
-	_, err = client.CreateApplicationEnvVar(appUUID, key, value, false, isPreview)
+	_, err = client.CreateApplicationEnvVar(cmd.Context(), appUUID, key, value, false, isPreview)
 	if err != nil {
 		ui.Error(fmt.Sprintf("Failed to add %s", key))
 		return fmt.Errorf("failed to add environment variable: %w", err)
@@ -196,14 +196,14 @@ func runEnvRm(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !confirmed {
-		ui.Dim("Cancelled")
+		ui.Dim("Canceled")
 		return nil
 	}
 
 	// Find the env var by key, matching the deployment type (default is preview, --prod targets production)
 	isPreview := !prodFlag
 	ui.Info("Finding environment variable...")
-	envVars, err := client.GetApplicationEnvVars(appUUID)
+	envVars, err := client.GetApplicationEnvVars(cmd.Context(), appUUID)
 	if err != nil {
 		ui.Error("Failed to fetch environment variables")
 		return fmt.Errorf("failed to fetch environment variables: %w", err)
@@ -227,7 +227,7 @@ func runEnvRm(cmd *cobra.Command, args []string) error {
 	}
 
 	ui.Info(fmt.Sprintf("Removing %s...", key))
-	err = client.DeleteApplicationEnvVar(appUUID, envUUID)
+	err = client.DeleteApplicationEnvVar(cmd.Context(), appUUID, envUUID)
 	if err != nil {
 		ui.Error(fmt.Sprintf("Failed to remove %s", key))
 		return fmt.Errorf("failed to remove environment variable: %w", err)
@@ -255,7 +255,7 @@ func runEnvPull(cmd *cobra.Command, args []string) error {
 	ui.Section(fmt.Sprintf("Pull Environment Variables - %s", deploymentType))
 
 	ui.Info("Fetching environment variables...")
-	envVars, err := client.GetApplicationEnvVars(appUUID)
+	envVars, err := client.GetApplicationEnvVars(cmd.Context(), appUUID)
 	if err != nil {
 		ui.Error("Failed to fetch environment variables")
 		return fmt.Errorf("failed to fetch environment variables: %w", err)
@@ -275,7 +275,7 @@ func runEnvPull(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if !overwrite {
-			ui.Dim("Cancelled")
+			ui.Dim("Canceled")
 			return nil
 		}
 	}
@@ -287,7 +287,7 @@ func runEnvPull(cmd *cobra.Command, args []string) error {
 	defer file.Close()
 
 	for _, env := range envVars {
-		file.WriteString(fmt.Sprintf("%s=%s\n", env.Key, env.Value))
+		fmt.Fprintf(file, "%s=%s\n", env.Key, env.Value)
 	}
 
 	ui.Spacer()
@@ -362,7 +362,7 @@ func runEnvPush(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !confirmed {
-		ui.Dim("Cancelled")
+		ui.Dim("Canceled")
 		return nil
 	}
 
@@ -375,7 +375,7 @@ func runEnvPush(cmd *cobra.Command, args []string) error {
 
 	for _, env := range envVars {
 		ui.Info(fmt.Sprintf("Pushing %s...", env.Key))
-		_, err := client.CreateApplicationEnvVar(appUUID, env.Key, env.Value, false, isPreview)
+		_, err := client.CreateApplicationEnvVar(cmd.Context(), appUUID, env.Key, env.Value, false, isPreview)
 		if err != nil {
 			ui.Warning(fmt.Sprintf("Failed to push %s: %v", env.Key, err))
 			failed++

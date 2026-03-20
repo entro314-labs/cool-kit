@@ -1,6 +1,7 @@
 package appdeploy
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -20,7 +21,7 @@ const (
 
 // WatchDeployment polls the deployment status and displays build logs.
 // Returns true if deployment succeeded, false if it failed.
-func WatchDeployment(client *api.Client, appUUID string) bool {
+func WatchDeployment(ctx context.Context, client *api.Client, appUUID string) bool {
 	ui.Spacer()
 
 	debug := os.Getenv("CDP_DEBUG") != ""
@@ -29,6 +30,7 @@ func WatchDeployment(client *api.Client, appUUID string) bool {
 	}
 
 	watcher := &deploymentWatcher{
+		ctx:               ctx,
 		client:            client,
 		appUUID:           appUUID,
 		debug:             debug,
@@ -40,6 +42,7 @@ func WatchDeployment(client *api.Client, appUUID string) bool {
 }
 
 type deploymentWatcher struct {
+	ctx                context.Context
 	client             *api.Client
 	appUUID            string
 	debug              bool
@@ -50,7 +53,7 @@ type deploymentWatcher struct {
 }
 
 func (w *deploymentWatcher) watch() bool {
-	for attempt := 0; attempt < maxPollAttempts; attempt++ {
+	for attempt := range maxPollAttempts {
 		status, done := w.checkDeploymentStatus(attempt)
 		if done {
 			return status == deploymentSuccess
@@ -72,7 +75,7 @@ const (
 
 func (w *deploymentWatcher) checkDeploymentStatus(attempt int) (deploymentStatus, bool) {
 	// Get deployments for the app
-	deployments, err := w.client.ListDeployments(w.appUUID)
+	deployments, err := w.client.ListDeployments(w.ctx, w.appUUID)
 	if err != nil {
 		return w.handleAPIError(err)
 	}
@@ -139,7 +142,7 @@ func (w *deploymentWatcher) processDeployment(deployment api.Deployment, attempt
 	}
 
 	// Try to get detailed deployment info with logs
-	detail, err := w.client.GetDeployment(deployUUID)
+	detail, err := w.client.GetDeployment(w.ctx, deployUUID)
 	if err != nil {
 		if w.debug {
 			fmt.Printf("[DEBUG] GetDeployment error: %v\n", err)
@@ -166,8 +169,8 @@ func (w *deploymentWatcher) printNewLogs(rawLogs string) {
 	parsedLogs := api.ParseLogs(rawLogs)
 	if len(parsedLogs) > w.lastLogLen {
 		newContent := parsedLogs[w.lastLogLen:]
-		lines := strings.Split(newContent, "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(newContent, "\n")
+		for line := range lines {
 			if line != "" {
 				fmt.Println(ui.DimStyle.Render("  " + line))
 			}
@@ -182,7 +185,7 @@ func (w *deploymentWatcher) checkStatus(status string) (deploymentStatus, bool) 
 	switch normalizedStatus {
 	case "finished":
 		return deploymentSuccess, true
-	case "failed", "error", "cancelled":
+	case "failed", "error", "canceled":
 		return deploymentFailed, true
 	case "running", "in_progress", "queued":
 		return deploymentInProgress, false
@@ -197,7 +200,7 @@ func (w *deploymentWatcher) checkFinalStatus() bool {
 		fmt.Printf("[DEBUG] Timeout reached, checking final app status\n")
 	}
 
-	app, err := w.client.GetApplication(w.appUUID)
+	app, err := w.client.GetApplication(w.ctx, w.appUUID)
 	if err != nil {
 		if w.debug {
 			fmt.Printf("[DEBUG] GetApplication error: %v\n", err)

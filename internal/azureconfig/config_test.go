@@ -151,8 +151,8 @@ func TestValidation(t *testing.T) {
 
 	// Test invalid configs
 	tests := []struct {
-		name     string
-		modify   func(*Config)
+		name       string
+		modify     func(*Config)
 		shouldFail bool
 	}{
 		{

@@ -50,7 +50,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	ui.Section("Deployment Logs")
 
 	ui.Info("Fetching logs...")
-	logs, err := client.GetDeploymentLogs(appUUID)
+	logs, err := client.GetDeploymentLogs(cmd.Context(), appUUID)
 	if err != nil {
 		ui.Error("Failed to fetch logs")
 		return fmt.Errorf("failed to fetch logs: %w", err)
@@ -71,8 +71,8 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	logStream := ui.NewLogStream()
 
 	// Process and display logs line by line
-	lines := strings.Split(logs, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(logs, "\n")
+	for line := range lines {
 		if line != "" {
 			logStream.WriteRaw(line + "\n")
 		}

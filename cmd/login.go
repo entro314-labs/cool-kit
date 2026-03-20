@@ -75,7 +75,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	ui.Spacer()
 	ui.Info("Connecting to Coolify...")
 	client := api.NewClient(coolifyURL, token)
-	if err := client.HealthCheck(); err != nil {
+	if err := client.HealthCheck(cmd.Context()); err != nil {
 		ui.Error("Connection failed")
 		return fmt.Errorf("failed to connect: %w", err)
 	}

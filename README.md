@@ -5,7 +5,7 @@
 Cool-Kit provides a comprehensive suite of commands for deploying, managing, and operating Coolify instances across local development and cloud platforms.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Go Version](https://img.shields.io/badge/go-1.25%2B-blue.svg)
+![Go Version](https://img.shields.io/badge/go-1.26%2B-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey.svg)
 
 ---
@@ -30,7 +30,7 @@ Cool-Kit provides a comprehensive suite of commands for deploying, managing, and
 - **OS**: Linux, macOS, or Windows
 - **RAM**: 2GB minimum (4GB recommended for local, 8GB for Azure)
 - **Disk**: 20GB available space
-- **Go**: 1.25+ (for building from source)
+- **Go**: 1.26+ (for building from source)
 
 ### Prerequisites
 
@@ -51,11 +51,30 @@ Cool-Kit provides a comprehensive suite of commands for deploying, managing, and
 
 ### Installation
 
-#### Download Pre-built Binary (Recommended)
+#### Homebrew (macOS/Linux)
 
 ```bash
-# Download latest release (coming soon)
-curl -fsSL https://github.com/entro314-labs/cool-kit/releases/latest/download/cool-kit-linux-amd64 -o cool-kit
+brew install --cask entro314-labs/tap/cool-kit
+```
+
+#### Winget (Windows)
+
+```powershell
+winget install Entro314Labs.CoolKit
+```
+
+#### AUR (Arch Linux)
+
+```bash
+yay -S cool-kit-bin
+```
+
+#### Download Pre-built Binary
+
+```bash
+# Download latest Linux amd64 release binary
+curl -fsSL https://github.com/entro314-labs/cool-kit/releases/latest/download/cool-kit_linux_x86_64.tar.gz -o cool-kit.tar.gz
+tar -xzf cool-kit.tar.gz
 chmod +x cool-kit
 sudo mv cool-kit /usr/local/bin/
 ```

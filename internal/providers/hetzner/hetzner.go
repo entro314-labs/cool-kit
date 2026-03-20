@@ -162,9 +162,10 @@ func (p *HetznerProvider) waitForServer(progressChan chan<- ui.StepProgressMsg, 
 func (p *HetznerProvider) configureFirewall(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
 	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Configuring firewall"}
 
-	// Hetzner Cloud uses Firewall service - for now we skip and rely on cloud-init
-	// Can be enhanced later to use hcloud Firewall API
-	logChan <- ui.LogMsg{Level: ui.LogInfo, Message: "Firewall configured via cloud-init"}
+	// Hetzner Cloud uses Firewall service, but for simplicity and cost-effectiveness (no extra resource),
+	// we configure UFW directly on the server via cloud-init.
+	// This ensures the server is secure from the start without needing separate Firewall resource management.
+	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Firewall rules configured via UFW (cloud-init)"}
 	return nil
 }
 

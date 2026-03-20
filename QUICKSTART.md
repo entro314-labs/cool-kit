@@ -10,23 +10,41 @@ Install → Run → Choose → Deploy → Access Dashboard
 
 ## 📦 **Installation**
 
-### **Option 1: Download Binary (Recommended)**
+### **Option 1: Homebrew (macOS/Linux)**
+
+```bash
+brew install --cask entro314-labs/tap/cool-kit
+```
+
+### **Option 2: Winget (Windows)**
+
+```powershell
+winget install Entro314Labs.CoolKit
+```
+
+### **Option 3: AUR (Arch Linux)**
+
+```bash
+yay -S cool-kit-bin
+```
+
+### **Option 4: Download Binary**
 
 ```bash
 # Download latest release
-# Download latest release
-curl -fsSL https://github.com/entro314-labs/cool-kit/releases/latest/download/cool-kit-linux-amd64 -o cool-kit
+curl -fsSL https://github.com/entro314-labs/cool-kit/releases/latest/download/cool-kit_linux_x86_64.tar.gz -o cool-kit.tar.gz
+tar -xzf cool-kit.tar.gz
 chmod +x cool-kit
 sudo mv cool-kit /usr/local/bin/
 
 # Or download specific version
-# Or download specific version
-wget https://github.com/entro314-labs/cool-kit/releases/latest/download/cool-kit-linux-amd64
-chmod +x cool-kit-linux-amd64
-sudo mv cool-kit-linux-amd64 /usr/local/bin/cool-kit
+wget https://github.com/entro314-labs/cool-kit/releases/download/v1.0.0/cool-kit_linux_x86_64.tar.gz
+tar -xzf cool-kit_linux_x86_64.tar.gz
+chmod +x cool-kit
+sudo mv cool-kit /usr/local/bin/cool-kit
 ```
 
-### **Option 2: Build from Source**
+### **Option 5: Build from Source**
 
 ```bash
 # Clone repository

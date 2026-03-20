@@ -41,35 +41,35 @@ func (l *Logger) Close() error {
 }
 
 // Info logs an info message
-func (l *Logger) Info(format string, args ...interface{}) {
+func (l *Logger) Info(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	color.Blue("ℹ %s", msg)
 	l.writeToFile("INFO", msg)
 }
 
 // Success logs a success message
-func (l *Logger) Success(format string, args ...interface{}) {
+func (l *Logger) Success(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	color.Green("✓ %s", msg)
 	l.writeToFile("SUCCESS", msg)
 }
 
 // Warning logs a warning message
-func (l *Logger) Warning(format string, args ...interface{}) {
+func (l *Logger) Warning(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	color.Yellow("⚠ %s", msg)
 	l.writeToFile("WARNING", msg)
 }
 
 // Error logs an error message
-func (l *Logger) Error(format string, args ...interface{}) {
+func (l *Logger) Error(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	color.Red("✗ %s", msg)
 	l.writeToFile("ERROR", msg)
 }
 
 // Debug logs a debug message (only if verbose)
-func (l *Logger) Debug(format string, args ...interface{}) {
+func (l *Logger) Debug(format string, args ...any) {
 	if !l.verbose {
 		return
 	}
@@ -88,7 +88,7 @@ func (l *Logger) Section(title string) {
 }
 
 // Step logs a step message
-func (l *Logger) Step(format string, args ...interface{}) {
+func (l *Logger) Step(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	color.Magenta("▶ %s", msg)
 	l.writeToFile("STEP", msg)
@@ -102,7 +102,9 @@ func (l *Logger) writeToFile(level, message string) {
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	logLine := fmt.Sprintf("[%s] [%s] %s\n", timestamp, level, message)
-	_, _ = l.logFile.WriteString(logLine)
+	if _, err := l.logFile.WriteString(logLine); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write to log file: %v\n", err)
+	}
 }
 
 // Banner displays a banner

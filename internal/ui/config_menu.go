@@ -20,7 +20,7 @@ type ConfigModel struct {
 	state   ConfigState
 	cfg     *config.Config
 	keys    []string
-	values  map[string]interface{}
+	values  map[string]any
 	cursor  int
 	width   int
 	height  int
@@ -75,7 +75,7 @@ func NewConfigModel() (ConfigModel, error) {
 	}
 	cfg := config.Get()
 
-	values := make(map[string]interface{})
+	values := make(map[string]any)
 	keys := []string{
 		"provider",
 		"environment",
@@ -146,13 +146,7 @@ func (m ConfigModel) View() string {
 	var s strings.Builder
 
 	// Calculate layout
-	totalWidth := m.width
-	if totalWidth < 80 {
-		totalWidth = 80
-	}
-	if totalWidth > 100 {
-		totalWidth = 100
-	}
+	totalWidth := min(max(m.width, 80), 100)
 
 	// Header - centered
 	header := configTitleStyle.Render("⚙️  Configuration Manager")

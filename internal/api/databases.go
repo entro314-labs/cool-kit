@@ -1,6 +1,9 @@
 package api
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // Database represents a Coolify database
 type Database struct {
@@ -61,99 +64,109 @@ type CreateServiceResponse struct {
 }
 
 // ListDatabases returns all databases
-func (c *Client) ListDatabases() ([]Database, error) {
+func (c *Client) ListDatabases(ctx context.Context) ([]Database, error) {
 	var databases []Database
-	err := c.Get("/databases", &databases)
+	err := c.Get(ctx, "/databases", &databases)
 	return databases, err
 }
 
 // GetDatabase returns a database by UUID
-func (c *Client) GetDatabase(uuid string) (*Database, error) {
+func (c *Client) GetDatabase(ctx context.Context, uuid string) (*Database, error) {
 	var database Database
-	err := c.Get("/databases/"+uuid, &database)
+	err := c.Get(ctx, "/databases/"+uuid, &database)
 	return &database, err
 }
 
 // CreateDatabase creates a new database
-func (c *Client) CreateDatabase(config map[string]interface{}) (map[string]interface{}, error) {
-	var result map[string]interface{}
-	err := c.Post("/databases", config, &result)
+func CreateDatabase[T any](c *Client, ctx context.Context, config T) (*CreateDatabaseResponse, error) {
+	var result CreateDatabaseResponse
+	err := c.Post(ctx, "/databases", config, &result)
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
+	return &result, nil
+}
+
+// CreateDatabase wrapper for method-style call with type inference
+func (c *Client) CreateDatabase(ctx context.Context, config any) (*CreateDatabaseResponse, error) {
+	return CreateDatabase(c, ctx, config)
 }
 
 // UpdateDatabase updates a database
-func (c *Client) UpdateDatabase(uuid string, updates map[string]interface{}) error {
-	return c.Patch("/databases/"+uuid, updates, nil)
+func (c *Client) UpdateDatabase(ctx context.Context, uuid string, updates UpdateDatabaseRequest) error {
+	return c.Patch(ctx, "/databases/"+uuid, updates, nil)
 }
 
 // DeleteDatabase deletes a database
-func (c *Client) DeleteDatabase(uuid string) error {
-	return c.Delete("/databases/" + uuid)
+func (c *Client) DeleteDatabase(ctx context.Context, uuid string) error {
+	return c.Delete(ctx, "/databases/"+uuid)
 }
 
 // StartDatabase starts a database
-func (c *Client) StartDatabase(uuid string) error {
-	return c.Post(fmt.Sprintf("/databases/%s/start", uuid), nil, nil)
+func (c *Client) StartDatabase(ctx context.Context, uuid string) error {
+	return c.Post(ctx, fmt.Sprintf("/databases/%s/start", uuid), nil, nil)
 }
 
 // StopDatabase stops a database
-func (c *Client) StopDatabase(uuid string) error {
-	return c.Post(fmt.Sprintf("/databases/%s/stop", uuid), nil, nil)
+func (c *Client) StopDatabase(ctx context.Context, uuid string) error {
+	return c.Post(ctx, fmt.Sprintf("/databases/%s/stop", uuid), nil, nil)
 }
 
 // RestartDatabase restarts a database
-func (c *Client) RestartDatabase(uuid string) error {
-	return c.Post(fmt.Sprintf("/databases/%s/restart", uuid), nil, nil)
+func (c *Client) RestartDatabase(ctx context.Context, uuid string) error {
+	return c.Post(ctx, fmt.Sprintf("/databases/%s/restart", uuid), nil, nil)
 }
 
 // ListServices returns all services
-func (c *Client) ListServices() ([]Service, error) {
+func (c *Client) ListServices(ctx context.Context) ([]Service, error) {
 	var services []Service
-	err := c.Get("/services", &services)
+	err := c.Get(ctx, "/services", &services)
 	return services, err
 }
 
 // GetService returns a service by UUID
-func (c *Client) GetService(uuid string) (*Service, error) {
+func (c *Client) GetService(ctx context.Context, uuid string) (*Service, error) {
 	var service Service
-	err := c.Get("/services/"+uuid, &service)
+	err := c.Get(ctx, "/services/"+uuid, &service)
 	return &service, err
 }
 
 // CreateService creates a new service
-func (c *Client) CreateService(config map[string]interface{}) (map[string]interface{}, error) {
-	var result map[string]interface{}
-	err := c.Post("/services", config, &result)
+func CreateService[T any](c *Client, ctx context.Context, config T) (*CreateServiceResponse, error) {
+	var result CreateServiceResponse
+	err := c.Post(ctx, "/services", config, &result)
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
+	return &result, nil
+}
+
+// CreateService wrapper
+func (c *Client) CreateService(ctx context.Context, config any) (*CreateServiceResponse, error) {
+	return CreateService(c, ctx, config)
 }
 
 // UpdateService updates a service
-func (c *Client) UpdateService(uuid string, updates map[string]interface{}) error {
-	return c.Patch("/services/"+uuid, updates, nil)
+func (c *Client) UpdateService(ctx context.Context, uuid string, updates UpdateServiceRequest) error {
+	return c.Patch(ctx, "/services/"+uuid, updates, nil)
 }
 
 // DeleteService deletes a service
-func (c *Client) DeleteService(uuid string) error {
-	return c.Delete("/services/" + uuid)
+func (c *Client) DeleteService(ctx context.Context, uuid string) error {
+	return c.Delete(ctx, "/services/"+uuid)
 }
 
 // StartService starts a service
-func (c *Client) StartService(uuid string) error {
-	return c.Post(fmt.Sprintf("/services/%s/start", uuid), nil, nil)
+func (c *Client) StartService(ctx context.Context, uuid string) error {
+	return c.Post(ctx, fmt.Sprintf("/services/%s/start", uuid), nil, nil)
 }
 
 // StopService stops a service
-func (c *Client) StopService(uuid string) error {
-	return c.Post(fmt.Sprintf("/services/%s/stop", uuid), nil, nil)
+func (c *Client) StopService(ctx context.Context, uuid string) error {
+	return c.Post(ctx, fmt.Sprintf("/services/%s/stop", uuid), nil, nil)
 }
 
 // RestartService restarts a service
-func (c *Client) RestartService(uuid string) error {
-	return c.Post(fmt.Sprintf("/services/%s/restart", uuid), nil, nil)
+func (c *Client) RestartService(ctx context.Context, uuid string) error {
+	return c.Post(ctx, fmt.Sprintf("/services/%s/restart", uuid), nil, nil)
 }

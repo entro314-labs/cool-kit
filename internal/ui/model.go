@@ -3,8 +3,9 @@ package ui
 import (
 	"fmt"
 	"strings"
-	"time"
 
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/entro314-labs/cool-kit/internal/config"
@@ -19,13 +20,11 @@ var (
 			MarginTop(1).
 			MarginBottom(1)
 
-	selectedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#EE6FF8")).
-			Bold(true)
+	// List styles
+	docStyle = lipgloss.NewStyle().Margin(1, 2)
 
-	descriptionStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#A49FA5")).
-				MarginLeft(2)
+	// Configuration styles
+	inputStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF75B7"))
 
 	buttonStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FAFAFA")).
@@ -54,68 +53,60 @@ type State int
 const (
 	StateSelectProvider State = iota
 	StateConfigureProvider
-	StateDeploying
-	StateComplete
-	StateError
 )
+
+// Wrapper for list items
+type providerItem struct {
+	title string
+	desc  string
+	value string
+	icon  string
+}
+
+func (i providerItem) Title() string       { return i.icon + " " + i.title }
+func (i providerItem) Description() string { return i.desc }
+func (i providerItem) FilterValue() string { return i.title }
 
 // Model represents the main UI model
 type Model struct {
-	state       State
-	Provider    string // Made public
-	config      *config.Config
-	choices     []Choice
-	cursor      int
-	selected    int
-	loading     bool
-	err         error
-	progress    int
-	totalSteps  int
-	currentStep string
-	logs        []string
-	width       int
-	height      int
-}
+	state         State
+	Provider      string
+	Configuration map[string]string // Collected configuration
+	config        *config.Config
 
-// Choice represents a selectable option
-type Choice struct {
-	Title       string
-	Description string
-	Value       string
-	Icon        string
+	// Bubbles
+	list       list.Model
+	inputs     []textinput.Model
+	focusIndex int
+
+	width  int
+	height int
 }
 
 // NewModel creates a new UI model
 func NewModel() Model {
-	providers := []Choice{
-		{
-			Title:       "Azure",
-			Description: "Deploy to Microsoft Azure cloud",
-			Value:       "azure",
-			Icon:        "☁️",
-		},
-		{
-			Title:       "Local",
-			Description: "Set up local development environment",
-			Value:       "local",
-			Icon:        "🏠",
-		},
-		{
-			Title:       "Production",
-			Description: "Deploy to production environment",
-			Value:       "production",
-			Icon:        "🚀",
-		},
+	items := []list.Item{
+		providerItem{title: "Azure", desc: "Deploy to Microsoft Azure cloud", value: "azure", icon: "☁️"},
+		providerItem{title: "Local", desc: "Set up local development environment", value: "local", icon: "🏠"},
+		providerItem{title: "Production", desc: "Deploy to production environment", value: "production", icon: "🚀"},
+		providerItem{title: "AWS", desc: "Deploy to Amazon Web Services", value: "aws", icon: "☁️"},
+		providerItem{title: "GCP", desc: "Deploy to Google Cloud Platform", value: "gcp", icon: "☁️"},
+		providerItem{title: "Hetzner", desc: "Deploy to Hetzner Cloud", value: "hetzner", icon: "☁️"},
+		providerItem{title: "DigitalOcean", desc: "Deploy to DigitalOcean", value: "digitalocean", icon: "🌊"},
 	}
 
+	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
+	l.Title = "Select Provider"
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(true)
+	l.Styles.Title = titleStyle
+
 	return Model{
-		state:      StateSelectProvider,
-		choices:    providers,
-		cursor:     0,
-		totalSteps: 5,
-		width:      80,
-		height:     24,
-		logs:       []string{},
+		state:         StateSelectProvider,
+		list:          l,
+		width:         80,
+		height:        24,
+		Configuration: make(map[string]string),
 	}
 }
 
@@ -126,280 +117,183 @@ func (m Model) Init() tea.Cmd {
 
 // Update handles updates
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
-			return m, tea.Quit
-
-		case tea.KeyEnter:
-			return m.handleEnter()
-
-		case tea.KeyUp:
-			if m.cursor > 0 {
-				m.cursor--
-			}
-
-		case tea.KeyDown:
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
-			}
-
-		case tea.KeyLeft:
-			if m.state == StateConfigureProvider {
-				return m.handleBack()
-			}
-
-		case tea.KeyRight, tea.KeyTab:
-			if m.state == StateConfigureProvider {
-				return m.handleNext()
-			}
-		}
-
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-
-	case ProgressMsg:
-		m.progress = msg.Progress
-		m.currentStep = msg.Step
-		m.logs = append(m.logs, fmt.Sprintf("✅ %s", msg.Step))
-
-	case ErrorMsg:
-		m.err = msg.Err
-		m.state = StateError
-		m.logs = append(m.logs, fmt.Sprintf("❌ Error: %v", msg.Err))
-
-	case CompleteMsg:
-		m.state = StateComplete
-		m.logs = append(m.logs, "🎉 Deployment completed successfully!")
+		m.list.SetWidth(msg.Width)
+		m.list.SetHeight(msg.Height - 4) // adjust for margins
 	}
 
-	return m, nil
+	// Handle state-specific updates
+	switch m.state {
+	case StateSelectProvider:
+		// Check for selection
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			if msg.String() == "enter" {
+				if i, ok := m.list.SelectedItem().(providerItem); ok {
+					m.Provider = i.value
+					m.setupInputs(m.Provider)
+					m.state = StateConfigureProvider
+				} else {
+					// Should not happen if items are strictly typed, but good practice
+					return m, tea.Batch(tea.Println("Error: Invalid selection type"))
+				}
+				return m, nil
+			}
+		}
+		m.list, cmd = m.list.Update(msg)
+		cmds = append(cmds, cmd)
+
+	case StateConfigureProvider:
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "enter":
+				if m.focusIndex == len(m.inputs) {
+					// Submit button selected
+					m.collectConfiguration()
+					return m, tea.Quit
+				}
+				// Next input
+				m.focusIndex++
+				if m.focusIndex > len(m.inputs) {
+					m.focusIndex = 0
+				}
+
+			case "tab", "down":
+				m.focusIndex++
+				if m.focusIndex > len(m.inputs) {
+					m.focusIndex = 0
+				}
+			case "shift+tab", "up":
+				m.focusIndex--
+				if m.focusIndex < 0 {
+					m.focusIndex = len(m.inputs)
+				}
+			case "esc":
+				m.state = StateSelectProvider
+			}
+		}
+
+		// Update inputs
+		for i := range m.inputs {
+			if i == m.focusIndex {
+				m.inputs[i].Focus()
+				m.inputs[i].TextStyle = inputStyle
+			} else {
+				m.inputs[i].Blur()
+				m.inputs[i].TextStyle = lipgloss.NewStyle()
+			}
+			m.inputs[i], cmd = m.inputs[i].Update(msg)
+			cmds = append(cmds, cmd)
+		}
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m *Model) setupInputs(provider string) {
+	m.inputs = []textinput.Model{}
+	m.focusIndex = 0
+
+	addInput := func(placeholder, value string, echo bool) {
+		t := textinput.New()
+		t.Placeholder = placeholder
+		t.SetValue(value)
+		if !echo {
+			t.EchoMode = textinput.EchoPassword
+			t.EchoCharacter = '•'
+		}
+		m.inputs = append(m.inputs, t)
+	}
+
+	switch provider {
+	case "azure":
+		addInput("Location", "East US", true)
+		addInput("VM Size", "Standard_B2s", true)
+		addInput("Disk Size (GB)", "30", true)
+		addInput("SSH Key Path", "~/.ssh/id_rsa.pub", true)
+	case "local":
+		addInput("App Port", "8000", true)
+		addInput("WebSocket Port", "6001", true)
+		addInput("Data Directory", "~/.coolify", true)
+	case "production":
+		addInput("Domain", "", true)
+		addInput("SSH Host", "", true)
+		addInput("SSH User", "root", true)
+		addInput("SSH Key Path", "~/.ssh/id_rsa", true)
+	default:
+		// Generic inputs
+		addInput("Configuration 1", "", true)
+		addInput("Configuration 2", "", true)
+	}
+}
+
+func (m *Model) collectConfiguration() {
+	// Map inputs back to known keys.
+	// In a real app, strict mapping would be better, but index-based mapping works for this wizard flow.
+	keys := []string{}
+
+	switch m.Provider {
+	case "azure":
+		keys = []string{"location", "vm_size", "disk_size", "ssh_key"}
+	case "local":
+		keys = []string{"app_port", "ws_port", "data_dir"}
+	case "production":
+		keys = []string{"domain", "ssh_host", "ssh_user", "ssh_key"}
+	default:
+		keys = []string{"config1", "config2"}
+	}
+
+	for i, input := range m.inputs {
+		if i < len(keys) {
+			m.Configuration[keys[i]] = input.Value()
+		}
+	}
 }
 
 // View renders the UI
 func (m Model) View() string {
 	switch m.state {
 	case StateSelectProvider:
-		return m.renderProviderSelection()
+		return docStyle.Render(m.list.View())
 	case StateConfigureProvider:
 		return m.renderConfiguration()
-	case StateDeploying:
-		return m.renderDeployment()
-	case StateComplete:
-		return m.renderComplete()
-	case StateError:
-		return m.renderError()
 	default:
 		return "Unknown state"
 	}
 }
 
-// renderProviderSelection renders the provider selection screen
-func (m Model) renderProviderSelection() string {
-	var content strings.Builder
-
-	// Title
-	content.WriteString(titleStyle.Render("🚀 Coolify Community CLI"))
-	content.WriteString("\n\n")
-	content.WriteString("Choose your deployment provider:\n\n")
-
-	// Choices
-	for i, choice := range m.choices {
-		cursor := " "
-		if m.cursor == i {
-			cursor = "👉"
-			content.WriteString(selectedStyle.Render(fmt.Sprintf("%s %s %s", cursor, choice.Icon, choice.Title)))
-			content.WriteString("\n")
-			content.WriteString(descriptionStyle.Render(fmt.Sprintf("   %s", choice.Description)))
-		} else {
-			content.WriteString(fmt.Sprintf("%s %s %s", cursor, choice.Icon, choice.Title))
-			content.WriteString("\n")
-			content.WriteString(descriptionStyle.Render(fmt.Sprintf("   %s", choice.Description)))
-		}
-		content.WriteString("\n")
-	}
-
-	// Instructions
-	content.WriteString("\n")
-	content.WriteString(descriptionStyle.Render("↑/↓ - Navigate  |  Enter - Select  |  Esc - Quit"))
-
-	return content.String()
-}
-
 // renderConfiguration renders the configuration screen
 func (m Model) renderConfiguration() string {
-	var content strings.Builder
+	var b strings.Builder
 
-	content.WriteString(titleStyle.Render("⚙️ Configure Deployment"))
-	content.WriteString("\n\n")
-	content.WriteString(fmt.Sprintf("Provider: %s\n\n", strings.ToUpper(m.Provider)))
+	b.WriteString(titleStyle.Render("⚙️ Configure Deployment"))
+	b.WriteString("\n\n")
+	b.WriteString(fmt.Sprintf("Provider: %s\n\n", strings.ToUpper(m.Provider)))
 
-	// Configuration form would go here
-	content.WriteString("Configuration options for ")
-	content.WriteString(m.Provider)
-	content.WriteString(" deployment:\n\n")
-
-	// Provider-specific configuration options
-	switch m.Provider {
-	case "azure":
-		content.WriteString("  • Location: East US\n")
-		content.WriteString("  • VM Size: Standard_B2s\n")
-		content.WriteString("  • Disk Size: 30 GB\n")
-		content.WriteString("  • SSH Key: ~/.ssh/id_rsa.pub\n")
-	case "local":
-		content.WriteString("  • App Port: 8000\n")
-		content.WriteString("  • WebSocket Port: 6001\n")
-		content.WriteString("  • Data Directory: ~/.coolify\n")
-	case "production":
-		content.WriteString("  • Domain: (required)\n")
-		content.WriteString("  • SSH Host: (required)\n")
-		content.WriteString("  • SSH User: root\n")
-		content.WriteString("  • SSH Key: ~/.ssh/id_rsa\n")
-	case "aws":
-		content.WriteString("  • Region: us-east-1\n")
-		content.WriteString("  • Instance Type: t3.medium\n")
-		content.WriteString("  • Disk Size: 30 GB\n")
-	case "gcp":
-		content.WriteString("  • Project: (required)\n")
-		content.WriteString("  • Zone: us-central1-a\n")
-		content.WriteString("  • Machine Type: e2-medium\n")
-	case "hetzner":
-		content.WriteString("  • Location: nbg1\n")
-		content.WriteString("  • Server Type: cx21\n")
-		content.WriteString("  • SSH Key: ~/.ssh/id_rsa.pub\n")
-	case "digitalocean":
-		content.WriteString("  • Region: nyc1\n")
-		content.WriteString("  • Size: s-2vcpu-2gb\n")
-		content.WriteString("  • SSH Key: ~/.ssh/id_rsa.pub\n")
-	default:
-		content.WriteString("  • Default settings will be used\n")
-	}
-
-	// Navigation
-	content.WriteString("\n")
-	content.WriteString(buttonStyle.Render("← Back"))
-	content.WriteString("   ")
-	content.WriteString(activeButtonStyle.Render("Next →"))
-
-	return content.String()
-}
-
-// renderDeployment renders the deployment progress screen
-func (m Model) renderDeployment() string {
-	var content strings.Builder
-
-	content.WriteString(titleStyle.Render("🚀 Deploying Coolify"))
-	content.WriteString("\n\n")
-
-	// Progress bar
-	progressWidth := 40
-	filled := int(float64(m.progress) / 100.0 * float64(progressWidth))
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", progressWidth-filled)
-	content.WriteString(fmt.Sprintf("Progress: [%s] %d%%\n", bar, m.progress))
-
-	// Current step
-	if m.currentStep != "" {
-		content.WriteString(fmt.Sprintf("\nCurrent: %s", m.currentStep))
-	}
-
-	// Logs
-	if len(m.logs) > 0 {
-		content.WriteString("\n\n")
-		content.WriteString("📋 Deployment Log:\n")
-		for _, log := range m.logs {
-			content.WriteString(fmt.Sprintf("  %s\n", log))
+	for i, input := range m.inputs {
+		b.WriteString(input.View())
+		if i < len(m.inputs)-1 {
+			b.WriteString("\n")
 		}
 	}
 
-	return content.String()
-}
+	b.WriteString("\n\n")
 
-// renderComplete renders the completion screen
-func (m Model) renderComplete() string {
-	var content strings.Builder
-
-	content.WriteString(titleStyle.Render("🎉 Deployment Complete!"))
-	content.WriteString("\n\n")
-	content.WriteString(statusStyle.Render("✅ Coolify has been successfully deployed!"))
-	content.WriteString("\n\n")
-
-	// Show access information
-	content.WriteString("📋 Access Information:\n")
-	content.WriteString("  • URL: http://your-coolify-instance.com\n")
-	content.WriteString("  • Admin: admin@coolify.local\n")
-	content.WriteString("  • Password: admin123\n")
-
-	content.WriteString("\n")
-	content.WriteString(buttonStyle.Render("Press Enter to exit"))
-
-	return content.String()
-}
-
-// renderError renders the error screen
-func (m Model) renderError() string {
-	var content strings.Builder
-
-	content.WriteString(titleStyle.Render("❌ Deployment Failed"))
-	content.WriteString("\n\n")
-	content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %v", m.err)))
-	content.WriteString("\n\n")
-
-	// Show logs
-	if len(m.logs) > 0 {
-		content.WriteString("📋 Deployment Log:\n")
-		for _, log := range m.logs {
-			content.WriteString(fmt.Sprintf("  %s\n", log))
-		}
+	// Render submit button
+	btn := "[ Submit ]"
+	if m.focusIndex == len(m.inputs) {
+		btn = activeButtonStyle.Render(btn)
+	} else {
+		btn = buttonStyle.Render(btn)
 	}
+	b.WriteString(btn)
 
-	content.WriteString("\n")
-	content.WriteString(buttonStyle.Render("Press Enter to exit"))
-
-	return content.String()
-}
-
-// Message types
-type ProgressMsg struct {
-	Progress int
-	Step     string
-}
-
-type ErrorMsg struct {
-	Err error
-}
-
-type CompleteMsg struct{}
-
-// Helper methods
-func (m Model) handleEnter() (Model, tea.Cmd) {
-	switch m.state {
-	case StateSelectProvider:
-		m.Provider = m.choices[m.cursor].Value
-		m.state = StateConfigureProvider
-		return m, nil
-	case StateComplete, StateError:
-		return m, tea.Quit
-	default:
-		return m, nil
-	}
-}
-
-func (m Model) handleBack() (Model, tea.Cmd) {
-	if m.state == StateConfigureProvider {
-		m.state = StateSelectProvider
-	}
-	return m, nil
-}
-
-func (m Model) handleNext() (Model, tea.Cmd) {
-	if m.state == StateConfigureProvider {
-		m.state = StateDeploying
-		return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-			// Simulate deployment progress
-			return ProgressMsg{Progress: 25, Step: "Initializing deployment..."}
-		})
-	}
-	return m, nil
+	return docStyle.Render(b.String())
 }

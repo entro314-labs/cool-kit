@@ -106,7 +106,7 @@ func destroyAzure() error {
 			return err
 		}
 		if !confirm {
-			ui.Info("Cancelled")
+			ui.Info("Canceled")
 			return nil
 		}
 	}

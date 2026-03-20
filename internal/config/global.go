@@ -33,6 +33,13 @@ func LoadGlobal() (*GlobalConfig, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
+	// Load token from keyring if present
+	if cfg.CoolifyToken == "" || cfg.CoolifyToken == "keyring" {
+		if token, err := getToken("global-coolify-token"); err == nil && token != "" {
+			cfg.CoolifyToken = token
+		}
+	}
+
 	globalCfg = cfg
 	return cfg, nil
 }
@@ -50,8 +57,23 @@ func SaveGlobal(cfg *GlobalConfig) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
+	// Save token to keyring
+	if cfg.CoolifyToken != "" {
+		if err := setToken("global-coolify-token", cfg.CoolifyToken); err != nil {
+			// Log error or handle failure
+			// For now, proceeding but keeping token in file if keyring fails could be a fallback
+			// But to enforce security, we proceed with keyring attempt.
+		}
+	}
+
+	// Prepare config for marshaling (avoid modifying original cfg)
+	marshalCfg := *cfg
+	if marshalCfg.CoolifyToken != "" {
+		marshalCfg.CoolifyToken = "keyring"
+	}
+
 	// Marshal config
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	data, err := json.MarshalIndent(marshalCfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}

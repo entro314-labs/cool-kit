@@ -74,7 +74,7 @@ func runServicesList(cmd *cobra.Command, args []string) error {
 			CompleteName: "✓ Loaded services",
 			Action: func() error {
 				var err error
-				databases, err = client.ListDatabases()
+				databases, err = client.ListDatabases(cmd.Context())
 				return err
 			},
 		},
@@ -97,9 +97,10 @@ func runServicesList(cmd *cobra.Command, args []string) error {
 	ui.Spacer()
 	for _, db := range databases {
 		statusIcon := "●"
-		if db.Status == "running" {
+		switch db.Status {
+		case "running":
 			statusIcon = ui.SuccessStyle.Render("●")
-		} else if db.Status == "exited" || db.Status == "stopped" {
+		case "exited", "stopped":
 			statusIcon = ui.ErrorStyle.Render("●")
 		}
 
@@ -136,7 +137,7 @@ func runServicesInfo(cmd *cobra.Command, args []string) error {
 			CompleteName: "✓ Loaded service",
 			Action: func() error {
 				var err error
-				database, err = client.GetDatabase(uuid)
+				database, err = client.GetDatabase(cmd.Context(), uuid)
 				return err
 			},
 		},
@@ -185,7 +186,7 @@ func runServicesRemove(cmd *cobra.Command, args []string) error {
 			CompleteName: "✓ Loaded service",
 			Action: func() error {
 				var err error
-				database, err = client.GetDatabase(uuid)
+				database, err = client.GetDatabase(cmd.Context(), uuid)
 				return err
 			},
 		},
@@ -206,7 +207,7 @@ func runServicesRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if !confirmed {
-		ui.Dim("Cancelled")
+		ui.Dim("Canceled")
 		return nil
 	}
 
@@ -216,7 +217,7 @@ func runServicesRemove(cmd *cobra.Command, args []string) error {
 			ActiveName:   "Removing service...",
 			CompleteName: "✓ Service removed",
 			Action: func() error {
-				return client.DeleteDatabase(uuid)
+				return client.DeleteDatabase(cmd.Context(), uuid)
 			},
 		},
 	})

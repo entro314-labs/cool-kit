@@ -71,7 +71,7 @@ func checkSystemInfo(client *StatusSSHClient) {
 		return
 	}
 
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		ui.Dim(fmt.Sprintf("  %s", strings.TrimSpace(line)))
 	}
 }
@@ -114,7 +114,7 @@ done`
 	}
 
 	foundAny := false
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		parts := strings.Split(line, ":")
 		if len(parts) < 2 {
 			continue
@@ -160,7 +160,7 @@ uptime 2>/dev/null | awk -F'load average:' '{print "Load: " $2}'`
 		return
 	}
 
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		ui.Dim(fmt.Sprintf("  %s", strings.TrimSpace(line)))
 	}
 }

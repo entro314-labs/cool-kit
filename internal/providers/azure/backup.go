@@ -144,9 +144,9 @@ done
 
 	// Parse backups
 	var backups []BackupInfo
-	backupStrings := strings.Split(output, "---")
+	backupStrings := strings.SplitSeq(output, "---")
 
-	for _, backupStr := range backupStrings {
+	for backupStr := range backupStrings {
 		backupStr = strings.TrimSpace(backupStr)
 		if backupStr == "" {
 			continue

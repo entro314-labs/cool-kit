@@ -35,7 +35,7 @@ func (f *TableFormatter) Format(data any) (err error) {
 	val := reflect.ValueOf(data)
 
 	// Dereference pointer if needed
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 
@@ -60,7 +60,7 @@ func (f *TableFormatter) formatSlice(w *tabwriter.Writer, val reflect.Value) err
 
 	// Get the first element to determine columns
 	firstElem := val.Index(0)
-	if firstElem.Kind() == reflect.Ptr {
+	if firstElem.Kind() == reflect.Pointer {
 		firstElem = firstElem.Elem()
 	}
 
@@ -81,7 +81,7 @@ func (f *TableFormatter) formatSlice(w *tabwriter.Writer, val reflect.Value) err
 	// Print rows
 	for i := 0; i < val.Len(); i++ {
 		elem := val.Index(i)
-		if elem.Kind() == reflect.Ptr {
+		if elem.Kind() == reflect.Pointer {
 			elem = elem.Elem()
 		}
 		row := f.formatStructRow(elem)
@@ -122,8 +122,7 @@ func (f *TableFormatter) formatMap(w *tabwriter.Writer, val reflect.Value) error
 func (f *TableFormatter) getHeaders(typ reflect.Type) []string {
 	var headers []string
 
-	for i := 0; i < typ.NumField(); i++ {
-		field := typ.Field(i)
+	for field := range typ.Fields() {
 
 		// Skip unexported fields
 		if !field.IsExported() {
@@ -192,12 +191,12 @@ func (f *TableFormatter) formatStructRow(val reflect.Value) []string {
 // formatValue formats a reflect.Value for display
 func (f *TableFormatter) formatValue(val reflect.Value) string {
 	// Handle nil pointers
-	if val.Kind() == reflect.Ptr && val.IsNil() {
+	if val.Kind() == reflect.Pointer && val.IsNil() {
 		return ""
 	}
 
 	// Dereference pointer
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 

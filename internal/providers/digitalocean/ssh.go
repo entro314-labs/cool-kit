@@ -144,7 +144,7 @@ func DestroyInstance() error {
 	var confirm string
 	fmt.Scanln(&confirm)
 	if strings.ToLower(confirm) != "yes" {
-		return fmt.Errorf("deletion cancelled")
+		return fmt.Errorf("deletion canceled")
 	}
 
 	if err := doclient.DeleteDroplet(droplet.ID); err != nil {

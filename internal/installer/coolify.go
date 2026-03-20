@@ -3,6 +3,7 @@ package installer
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -58,10 +59,10 @@ func NewCoolifyDeployer(cfg *config.Config, progressChan chan<- ProgressUpdate, 
 }
 
 // Deploy executes the official Coolify installation
-func (d *CoolifyDeployer) Deploy() (string, error) {
+func (d *CoolifyDeployer) Deploy(ctx context.Context) (string, error) {
 	steps := []struct {
 		name string
-		fn   func() error
+		fn   func(context.Context) error
 	}{
 		{"Preparing environment", d.prepareEnvironment},
 		{"Downloading Coolify installer", d.downloadInstaller},
@@ -76,7 +77,7 @@ func (d *CoolifyDeployer) Deploy() (string, error) {
 		d.sendProgress(i+1, totalSteps, step.name, 0, fmt.Sprintf("Starting: %s", step.name), nil)
 		d.sendLog(fmt.Sprintf("[%d/%d] %s...", i+1, totalSteps, step.name))
 
-		if err := step.fn(); err != nil {
+		if err := step.fn(ctx); err != nil {
 			d.sendProgress(i+1, totalSteps, step.name, 0, "", err)
 			d.sendLog(fmt.Sprintf("❌ Failed: %s - %v", step.name, err))
 			return "", fmt.Errorf("step '%s' failed: %w", step.name, err)
@@ -95,7 +96,7 @@ func (d *CoolifyDeployer) Deploy() (string, error) {
 }
 
 // prepareEnvironment prepares the deployment environment
-func (d *CoolifyDeployer) prepareEnvironment() error {
+func (d *CoolifyDeployer) prepareEnvironment(ctx context.Context) error {
 	d.sendLog("Checking system requirements...")
 
 	// Check if running as root or with sudo
@@ -116,7 +117,7 @@ func (d *CoolifyDeployer) prepareEnvironment() error {
 }
 
 // downloadInstaller downloads the official Coolify install script
-func (d *CoolifyDeployer) downloadInstaller() error {
+func (d *CoolifyDeployer) downloadInstaller(ctx context.Context) error {
 	d.sendLog(fmt.Sprintf("Downloading installer from %s...", CoolifyInstallScriptURL))
 
 	// Create temporary directory
@@ -126,7 +127,11 @@ func (d *CoolifyDeployer) downloadInstaller() error {
 	}
 
 	// Download install script
-	resp, err := http.Get(CoolifyInstallScriptURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", CoolifyInstallScriptURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to download install script: %w", err)
 	}
@@ -159,7 +164,7 @@ func (d *CoolifyDeployer) downloadInstaller() error {
 }
 
 // executeInstaller runs the official Coolify installation script
-func (d *CoolifyDeployer) executeInstaller() error {
+func (d *CoolifyDeployer) executeInstaller(ctx context.Context) error {
 	scriptPath := filepath.Join(d.installDir, "install.sh")
 	d.sendLog(fmt.Sprintf("Executing installer: %s", scriptPath))
 	d.sendLog("This may take several minutes depending on your server...")
@@ -182,7 +187,7 @@ func (d *CoolifyDeployer) executeInstaller() error {
 	}
 
 	// Execute the install script
-	cmd := exec.Command("bash", scriptPath)
+	cmd := exec.CommandContext(ctx, "bash", scriptPath)
 	cmd.Env = env
 
 	// Capture output
@@ -227,11 +232,11 @@ func (d *CoolifyDeployer) streamOutput(reader io.Reader, prefix string) {
 }
 
 // getDashboardURL retrieves the Coolify dashboard URL
-func (d *CoolifyDeployer) getDashboardURL() error {
+func (d *CoolifyDeployer) getDashboardURL(ctx context.Context) error {
 	d.sendLog("Retrieving dashboard URL...")
 
 	// Get public IP
-	publicIP, err := d.getPublicIP()
+	publicIP, err := d.getPublicIP(ctx)
 	if err != nil {
 		d.sendLog("⚠️ Failed to get public IP, using localhost")
 		publicIP = "localhost"
@@ -245,8 +250,12 @@ func (d *CoolifyDeployer) getDashboardURL() error {
 }
 
 // getPublicIP retrieves the server's public IP address
-func (d *CoolifyDeployer) getPublicIP() (string, error) {
-	resp, err := http.Get("https://ifconfig.io")
+func (d *CoolifyDeployer) getPublicIP(ctx context.Context) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://ifconfig.io", nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -269,7 +278,7 @@ func (d *CoolifyDeployer) getPublicIP() (string, error) {
 }
 
 // healthCheck performs health checks on the deployed Coolify instance
-func (d *CoolifyDeployer) healthCheck() error {
+func (d *CoolifyDeployer) healthCheck(ctx context.Context) error {
 	d.sendLog("Running health checks...")
 
 	// Wait a bit for services to stabilize
@@ -277,7 +286,7 @@ func (d *CoolifyDeployer) healthCheck() error {
 	time.Sleep(10 * time.Second)
 
 	// Check if Coolify container is running
-	checkCmd := exec.Command("docker", "inspect", "--format={{.State.Health.Status}}", "coolify")
+	checkCmd := exec.CommandContext(ctx, "docker", "inspect", "--format={{.State.Health.Status}}", "coolify")
 	output, err := checkCmd.Output()
 	if err != nil {
 		d.sendLog("⚠️ Could not check Coolify container health")
@@ -289,8 +298,12 @@ func (d *CoolifyDeployer) healthCheck() error {
 
 	// Check HTTP response
 	maxRetries := 5
-	for i := 0; i < maxRetries; i++ {
-		resp, err := http.Get(d.dashboardURL + "/up")
+	for i := range maxRetries {
+		req, err := http.NewRequestWithContext(ctx, "GET", d.dashboardURL+"/up", nil)
+		if err != nil {
+			continue
+		}
+		resp, err := http.DefaultClient.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			d.sendLog("✓ Coolify is responding to HTTP requests")
 			resp.Body.Close()

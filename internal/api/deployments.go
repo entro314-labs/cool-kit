@@ -1,14 +1,18 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 )
 
 // Deploy triggers a deployment for an application
 // pr parameter: 0 for production, >0 for preview deployment
-func (c *Client) Deploy(uuid string, force bool, pr int) (*DeployResponse, error) {
+// Deploy triggers a deployment for an application
+// pr parameter: 0 for production, >0 for preview deployment
+func (c *Client) Deploy(ctx context.Context, uuid string, force bool, pr int) (*DeployResponse, error) {
 	params := map[string]string{
 		"uuid": uuid,
 	}
@@ -19,12 +23,12 @@ func (c *Client) Deploy(uuid string, force bool, pr int) (*DeployResponse, error
 		params["pr"] = fmt.Sprintf("%d", pr)
 	}
 	var resp DeployResponse
-	err := c.GetWithParams("/deploy", params, &resp)
+	err := c.GetWithParams(ctx, "/deploy", params, &resp)
 	return &resp, err
 }
 
 // DeployByTag triggers a deployment by tag
-func (c *Client) DeployByTag(tag string, force bool) (*DeployResponse, error) {
+func (c *Client) DeployByTag(ctx context.Context, tag string, force bool) (*DeployResponse, error) {
 	params := map[string]string{
 		"tag": tag,
 	}
@@ -32,38 +36,38 @@ func (c *Client) DeployByTag(tag string, force bool) (*DeployResponse, error) {
 		params["force"] = "true"
 	}
 	var resp DeployResponse
-	err := c.GetWithParams("/deploy", params, &resp)
+	err := c.GetWithParams(ctx, "/deploy", params, &resp)
 	return &resp, err
 }
 
 // GetDeploymentLogs returns logs for a deployment
-func (c *Client) GetDeploymentLogs(appUUID string) (string, error) {
+func (c *Client) GetDeploymentLogs(ctx context.Context, appUUID string) (string, error) {
 	var resp DeploymentLogsResponse
-	err := c.Get(fmt.Sprintf("/applications/%s/logs", appUUID), &resp)
+	err := c.Get(ctx, fmt.Sprintf("/applications/%s/logs", appUUID), &resp)
 	return resp.Logs, err
 }
 
 // Deployment represents a deployment in Coolify
 // Note: Coolify API returns some IDs as strings
 type Deployment struct {
-	ID               interface{} `json:"id"`
-	UUID             string      `json:"uuid"`
-	Status           string      `json:"status"`
-	ApplicationID    interface{} `json:"application_id"`
-	ApplicationUUID  string      `json:"application_uuid"`
-	DeploymentUUID   string      `json:"deployment_uuid"`
-	PullRequestID    interface{} `json:"pull_request_id"`
-	ForceRebuild     bool        `json:"force_rebuild"`
-	CommitMessage    string      `json:"commit_message"`
-	Commit           string      `json:"commit"`
-	GitCommitSha     string      `json:"git_commit_sha"`
-	GitType          string      `json:"git_type"`
-	OnlyThisServer   bool        `json:"only_this_server"`
-	RollbackToUUID   string      `json:"rollback_to"`
-	CurrentProcessID string      `json:"current_process_id"`
-	DestinationID    interface{} `json:"destination_id"`
-	CreatedAt        string      `json:"created_at"`
-	UpdatedAt        string      `json:"updated_at"`
+	ID               ID     `json:"id"`
+	UUID             string `json:"uuid"`
+	Status           string `json:"status"`
+	ApplicationID    ID     `json:"application_id"`
+	ApplicationUUID  string `json:"application_uuid"`
+	DeploymentUUID   string `json:"deployment_uuid"`
+	PullRequestID    ID     `json:"pull_request_id"`
+	ForceRebuild     bool   `json:"force_rebuild"`
+	CommitMessage    string `json:"commit_message"`
+	Commit           string `json:"commit"`
+	GitCommitSha     string `json:"git_commit_sha"`
+	GitType          string `json:"git_type"`
+	OnlyThisServer   bool   `json:"only_this_server"`
+	RollbackToUUID   string `json:"rollback_to"`
+	CurrentProcessID string `json:"current_process_id"`
+	DestinationID    ID     `json:"destination_id"`
+	CreatedAt        string `json:"created_at"`
+	UpdatedAt        string `json:"updated_at"`
 }
 
 // DeploymentLogsResponse represents the response from the deployment logs endpoint
@@ -72,35 +76,35 @@ type DeploymentLogsResponse struct {
 }
 
 // ListDeployments returns deployments for an application
-func (c *Client) ListDeployments(appUUID string) ([]Deployment, error) {
+func (c *Client) ListDeployments(ctx context.Context, appUUID string) ([]Deployment, error) {
 	var deployments []Deployment
-	err := c.Get(fmt.Sprintf("/deployments?application_uuid=%s", appUUID), &deployments)
+	err := c.Get(ctx, fmt.Sprintf("/deployments?application_uuid=%s", appUUID), &deployments)
 	return deployments, err
 }
 
 // DeploymentDetail contains full deployment info including logs
 // Note: Coolify API returns some IDs as strings, so we use json.Number/interface{} for flexibility
 type DeploymentDetail struct {
-	ID              interface{} `json:"id"`
-	ApplicationID   interface{} `json:"application_id"`
-	DeploymentUUID  string      `json:"deployment_uuid"`
-	Status          string      `json:"status"`
-	Logs            string      `json:"logs"`
-	Commit          string      `json:"commit"`
-	CommitMessage   string      `json:"commit_message"`
-	ServerID        interface{} `json:"server_id"`
-	ApplicationName string      `json:"application_name"`
-	ServerName      string      `json:"server_name"`
-	DeploymentURL   string      `json:"deployment_url"`
-	DestinationID   interface{} `json:"destination_id"`
-	CreatedAt       string      `json:"created_at"`
-	UpdatedAt       string      `json:"updated_at"`
+	ID              ID     `json:"id"`
+	ApplicationID   ID     `json:"application_id"`
+	DeploymentUUID  string `json:"deployment_uuid"`
+	Status          string `json:"status"`
+	Logs            string `json:"logs"`
+	Commit          string `json:"commit"`
+	CommitMessage   string `json:"commit_message"`
+	ServerID        ID     `json:"server_id"`
+	ApplicationName string `json:"application_name"`
+	ServerName      string `json:"server_name"`
+	DeploymentURL   string `json:"deployment_url"`
+	DestinationID   ID     `json:"destination_id"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
 }
 
 // GetDeployment returns a specific deployment by UUID with full details
-func (c *Client) GetDeployment(deploymentUUID string) (*DeploymentDetail, error) {
+func (c *Client) GetDeployment(ctx context.Context, deploymentUUID string) (*DeploymentDetail, error) {
 	var deployment DeploymentDetail
-	err := c.Get(fmt.Sprintf("/deployments/%s", deploymentUUID), &deployment)
+	err := c.Get(ctx, fmt.Sprintf("/deployments/%s", deploymentUUID), &deployment)
 	return &deployment, err
 }
 
@@ -119,59 +123,53 @@ func ParseLogs(rawLogs string) string {
 		return ""
 	}
 
-	// Try to parse as JSON array
-	var entries []LogEntry
+	// Use a JSON decoder to handle concatenated JSON objects/arrays
+	reader := strings.NewReader(rawLogs)
+	decoder := json.NewDecoder(reader)
 
-	// The logs might be multiple JSON arrays concatenated, so we need to handle that
-	// First, try parsing as a single array
-	if err := json.Unmarshal([]byte(rawLogs), &entries); err == nil {
-		return formatLogEntries(entries)
-	}
-
-	// If that fails, try to find and parse JSON arrays within the string
 	var allEntries []LogEntry
-	remaining := rawLogs
 
-	for len(remaining) > 0 {
-		// Find the start of a JSON array
-		start := strings.Index(remaining, "[")
-		if start == -1 {
-			break
-		}
-
-		// Find the matching end bracket
-		depth := 0
-		end := -1
-		for i := start; i < len(remaining); i++ {
-			if remaining[i] == '[' {
-				depth++
-			} else if remaining[i] == ']' {
-				depth--
-				if depth == 0 {
-					end = i + 1
-					break
-				}
+	for {
+		// Try to decode the next JSON value
+		// It could be a single LogEntry, or an array []LogEntry
+		// We'll decode into json.RawMessage first to see what we have
+		var raw json.RawMessage
+		if err := decoder.Decode(&raw); err != nil {
+			if err == io.EOF {
+				break
 			}
-		}
-
-		if end == -1 {
+			// If we can't decode as JSON, checking if we can skip or if it's mixed content
+			// For robustness, if decode fails, we might just stop or skip a byte
+			// strict JSON parsing might fail on partial logs
 			break
 		}
 
-		// Try to parse this array
+		// Try to unmarshal as array of LogEntry
 		var entries []LogEntry
-		if err := json.Unmarshal([]byte(remaining[start:end]), &entries); err == nil {
+		if err := json.Unmarshal(raw, &entries); err == nil {
 			allEntries = append(allEntries, entries...)
+			continue
 		}
 
-		remaining = remaining[end:]
+		// Try to unmarshal as single LogEntry
+		var entry LogEntry
+		if err := json.Unmarshal(raw, &entry); err == nil {
+			allEntries = append(allEntries, entry)
+			continue
+		}
 	}
 
 	if len(allEntries) > 0 {
 		return formatLogEntries(allEntries)
 	}
 
-	// If nothing worked, return raw logs
+	// Fallback mechanism: sometimes logs are just lines of strings if not valid JSON
+	// Check if it looks like JSON at all
+	trimmed := strings.TrimSpace(rawLogs)
+	if !strings.HasPrefix(trimmed, "[") && !strings.HasPrefix(trimmed, "{") {
+		return rawLogs
+	}
+
 	return rawLogs
 }
 
@@ -188,8 +186,8 @@ func formatLogEntries(entries []LogEntry) string {
 }
 
 // GetBuildLogs returns build logs for a specific deployment
-func (c *Client) GetBuildLogs(deploymentUUID string) (string, error) {
-	deployment, err := c.GetDeployment(deploymentUUID)
+func (c *Client) GetBuildLogs(ctx context.Context, deploymentUUID string) (string, error) {
+	deployment, err := c.GetDeployment(ctx, deploymentUUID)
 	if err != nil {
 		return "", err
 	}
@@ -197,14 +195,14 @@ func (c *Client) GetBuildLogs(deploymentUUID string) (string, error) {
 }
 
 // HealthCheck validates the API connection
-func (c *Client) HealthCheck() error {
+func (c *Client) HealthCheck(ctx context.Context) error {
 	var resp HealthCheckResponse
 	// Try to get the version endpoint instead since healthcheck might not be available
-	err := c.Get("/version", &resp)
+	err := c.Get(ctx, "/version", &resp)
 	if err != nil {
 		// If version fails, try listing teams as a validation
 		var teams []Team
-		err = c.Get("/teams", &teams)
+		err = c.Get(ctx, "/teams", &teams)
 	}
 	return err
 }

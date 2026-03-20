@@ -1,6 +1,7 @@
 package appdeploy
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/entro314-labs/cool-kit/internal/api"
@@ -12,7 +13,7 @@ import (
 )
 
 // DeployGit handles Git-based deployments
-func DeployGit(client *api.Client, globalCfg *config.GlobalConfig, projectCfg *config.ProjectConfig, deploymentConfig *smart.DeploymentConfig, prNumber int, verbose bool) error {
+func DeployGit(ctx context.Context, client *api.Client, globalCfg *config.GlobalConfig, projectCfg *config.ProjectConfig, deploymentConfig *smart.DeploymentConfig, prNumber int, verbose bool) error {
 	ghClient := git.NewGitHubClient(globalCfg.GitHubToken)
 
 	// Get GitHub user
@@ -28,7 +29,7 @@ func DeployGit(client *api.Client, globalCfg *config.GlobalConfig, projectCfg *c
 	}
 
 	// Handle GitHub App selection (if needed)
-	if err := handleGitHubAppSelection(client, projectCfg, needsRepoCreation, verbose); err != nil {
+	if err := handleGitHubAppSelection(ctx, client, projectCfg, needsRepoCreation, verbose); err != nil {
 		return err
 	}
 
@@ -36,7 +37,7 @@ func DeployGit(client *api.Client, globalCfg *config.GlobalConfig, projectCfg *c
 	ui.Spacer()
 	ui.Divider()
 
-	tasks := buildGitDeploymentTasks(client, ghClient, globalCfg, projectCfg, deploymentConfig, user.Login, needsRepoCreation, verbose)
+	tasks := buildGitDeploymentTasks(ctx, client, ghClient, globalCfg, projectCfg, deploymentConfig, user.Login, needsRepoCreation, verbose)
 
 	if err := ui.RunTasksVerbose(tasks, verbose); err != nil {
 		ui.Error("Deployment setup failed")
@@ -46,7 +47,7 @@ func DeployGit(client *api.Client, globalCfg *config.GlobalConfig, projectCfg *c
 	// Watch deployment
 	ui.Info("Watching deployment...")
 
-	success := WatchDeployment(client, projectCfg.AppUUID)
+	success := WatchDeployment(ctx, client, projectCfg.AppUUID)
 
 	if !success {
 		ui.Error("Deployment failed")
@@ -61,7 +62,7 @@ func DeployGit(client *api.Client, globalCfg *config.GlobalConfig, projectCfg *c
 	// Get app info for URL
 	ui.Success("Deployment complete")
 
-	app, err := client.GetApplication(projectCfg.AppUUID)
+	app, err := client.GetApplication(ctx, projectCfg.AppUUID)
 	if err == nil && app.Fqdn != nil && *app.Fqdn != "" {
 		ui.Spacer()
 		ui.KeyValue("URL", ui.InfoStyle.Render(*app.Fqdn))
@@ -125,7 +126,7 @@ func handleGitHubRepoSetup(ghClient *git.GitHubClient, projectCfg *config.Projec
 	return nil
 }
 
-func handleGitHubAppSelection(client *api.Client, projectCfg *config.ProjectConfig, needsRepoCreation bool, verbose bool) error {
+func handleGitHubAppSelection(ctx context.Context, client *api.Client, projectCfg *config.ProjectConfig, needsRepoCreation bool, verbose bool) error {
 	// Use saved GitHub App if available
 	if projectCfg.GitHubAppUUID != "" {
 		return nil
@@ -149,7 +150,7 @@ func handleGitHubAppSelection(client *api.Client, projectCfg *config.ProjectConf
 			CompleteName: "✓ Loaded GitHub Apps",
 			Action: func() error {
 				var err error
-				githubApps, err = client.ListGitHubApps()
+				githubApps, err = client.ListGitHubApps(ctx)
 				return err
 			},
 		},
@@ -201,6 +202,7 @@ func handleGitHubAppSelection(client *api.Client, projectCfg *config.ProjectConf
 }
 
 func buildGitDeploymentTasks(
+	ctx context.Context,
 	client *api.Client,
 	ghClient *git.GitHubClient,
 	globalCfg *config.GlobalConfig,
@@ -215,10 +217,10 @@ func buildGitDeploymentTasks(
 	// Create project and environment if needed
 	needsProjectCreation := projectCfg.ProjectUUID == ""
 	if needsProjectCreation {
-		tasks = append(tasks, createProjectTask(client, projectCfg))
-		tasks = append(tasks, setupEnvironmentTask(client, projectCfg))
+		tasks = append(tasks, createProjectTask(ctx, client, projectCfg))
+		tasks = append(tasks, setupEnvironmentTask(ctx, client, projectCfg))
 	} else {
-		tasks = append(tasks, checkEnvironmentTask(client, projectCfg))
+		tasks = append(tasks, checkEnvironmentTask(ctx, client, projectCfg))
 	}
 
 	// Create GitHub repo if needed
@@ -236,16 +238,16 @@ func buildGitDeploymentTasks(
 
 	// Create Coolify app if needed
 	if projectCfg.AppUUID == "" {
-		tasks = append(tasks, createGitAppTask(client, projectCfg, username))
+		tasks = append(tasks, createGitAppTask(ctx, client, projectCfg, username))
 	}
 
 	// Provision services if detected (only on first deploy)
 	if deploymentConfig != nil && len(deploymentConfig.Services) > 0 {
-		tasks = append(tasks, provisionServicesTask(client, projectCfg, deploymentConfig))
+		tasks = append(tasks, provisionServicesTask(ctx, client, projectCfg, deploymentConfig))
 	}
 
 	// Trigger deployment
-	tasks = append(tasks, triggerGitDeploymentTask(client, projectCfg))
+	tasks = append(tasks, triggerGitDeploymentTask(ctx, client, projectCfg))
 
 	return tasks
 }
@@ -313,7 +315,7 @@ func pushCodeTask(ghClient *git.GitHubClient, globalCfg *config.GlobalConfig, pr
 			if branch == "" {
 				b, err := git.GetCurrentBranch(".")
 				if err != nil {
-					ui.Dim(fmt.Sprintf("Warning: Failed to get current branch: %v", err))
+					return fmt.Errorf("failed to get current branch (is this a git repo?): %w", err)
 				}
 				if b == "" {
 					branch = config.DefaultBranch
@@ -328,7 +330,7 @@ func pushCodeTask(ghClient *git.GitHubClient, globalCfg *config.GlobalConfig, pr
 	}
 }
 
-func createGitAppTask(client *api.Client, projectCfg *config.ProjectConfig, username string) ui.Task {
+func createGitAppTask(ctx context.Context, client *api.Client, projectCfg *config.ProjectConfig, username string) ui.Task {
 	return ui.Task{
 		Name:         "create-app",
 		ActiveName:   "Creating Coolify application...",
@@ -348,7 +350,7 @@ func createGitAppTask(client *api.Client, projectCfg *config.ProjectConfig, user
 			if branch == "" {
 				b, err := git.GetCurrentBranch(".")
 				if err != nil {
-					ui.Dim(fmt.Sprintf("Warning: Failed to get current branch: %v", err))
+					return fmt.Errorf("failed to get current branch (is this a git repo?): %w", err)
 				}
 				if b == "" {
 					branch = config.DefaultBranch
@@ -366,7 +368,7 @@ func createGitAppTask(client *api.Client, projectCfg *config.ProjectConfig, user
 			healthCheckEnabled := isStatic
 			healthCheckPath := "/"
 
-			resp, err := client.CreatePrivateGitHubApp(&api.CreatePrivateGitHubAppRequest{
+			resp, err := client.CreatePrivateGitHubApp(ctx, &api.CreatePrivateGitHubAppRequest{
 				ProjectUUID:        projectCfg.ProjectUUID,
 				ServerUUID:         projectCfg.ServerUUID,
 				EnvironmentUUID:    projectCfg.EnvironmentUUID,
@@ -396,13 +398,13 @@ func createGitAppTask(client *api.Client, projectCfg *config.ProjectConfig, user
 	}
 }
 
-func triggerGitDeploymentTask(client *api.Client, projectCfg *config.ProjectConfig) ui.Task {
+func triggerGitDeploymentTask(ctx context.Context, client *api.Client, projectCfg *config.ProjectConfig) ui.Task {
 	return ui.Task{
 		Name:         "trigger-deploy",
 		ActiveName:   "Triggering deployment...",
 		CompleteName: "✓ Triggered deployment",
 		Action: func() error {
-			_, err := client.Deploy(projectCfg.AppUUID, false, 0)
+			_, err := client.Deploy(ctx, projectCfg.AppUUID, false, 0)
 			if err != nil {
 				return fmt.Errorf("failed to trigger deployment: %w", err)
 			}

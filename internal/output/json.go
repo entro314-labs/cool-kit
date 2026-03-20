@@ -15,7 +15,7 @@ func NewJSONFormatter(opts Options) *JSONFormatter {
 }
 
 // Format formats the data as JSON
-func (f *JSONFormatter) Format(data interface{}) error {
+func (f *JSONFormatter) Format(data any) error {
 	encoder := json.NewEncoder(f.opts.Writer)
 	return encoder.Encode(data)
 }
