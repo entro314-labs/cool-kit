@@ -221,7 +221,7 @@ func Table(headers []string, rows [][]string) {
 				rowLine.WriteString("  ")
 			}
 			if i < len(widths) {
-				rowLine.WriteString(fmt.Sprintf("%-*s", widths[i], cell))
+				fmt.Fprintf(&rowLine, "%-*s", widths[i], cell)
 			}
 		}
 		fmt.Println(rowLine.String())

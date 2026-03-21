@@ -248,10 +248,6 @@ func (p *ProductionProvider) configureSSL(progressChan chan<- ui.StepProgressMsg
 	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Configuring SSL"}
 
 	domain := p.config.Production.Domain
-	sslEmail := p.config.Production.SSLEmail
-	if sslEmail == "" {
-		sslEmail = "admin@" + domain
-	}
 
 	// Coolify handles SSL internally via Traefik/Caddy, but we verify the setup
 	sslCheck := `

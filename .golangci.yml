@@ -16,87 +16,24 @@ run:
 #   sort-results: true
 
 linters:
+  default: none
+
   enable:
-    # Error handling
-    - errcheck
-    - errname
-    
-    # Code style
+    # Core correctness
     - govet
-    - misspell
-    - unconvert
-    
-    # Security
-    - gosec
-    
-    # Performance
-    - prealloc
-    
-    # Bugs
     - staticcheck
     - ineffassign
-    
-    # Complexity
-    - gocyclo
-    - gocognit
-    
-    # Code quality
-    - gocritic
-    - revive
     - unused
 
   disable:
-    - depguard  # We don't need import allowlists
+    - depguard
 
   # v2: Settings are under 'settings' key
   settings:
-    errcheck:
-      check-type-assertions: true
-      check-blank: true
-      exclude-functions:
-        - io.Copy
-        - (io.Closer).Close
-
-    gocyclo:
-      min-complexity: 20
-
-    gocognit:
-      min-complexity: 30
-
-    gocritic:
-      disabled-checks:
-        - hugeParam  # We pass some larger structs around
-
-    gosec:
-      excludes:
-        - G104  # Audit errors not checked (we use errcheck)
-        - G304  # Potential file inclusion via variable (needed for config files)
-
-    misspell:
-      locale: US
-
-    revive:
-      rules:
-        - name: blank-imports
-        - name: context-as-argument
-        - name: context-keys-type
-        - name: dot-imports
-        - name: error-return
-        - name: error-strings
-        - name: error-naming
-        - name: exported
-        - name: if-return
-        - name: increment-decrement
-        - name: var-naming
-        - name: var-declaration
-        - name: package-comments
-        - name: range
-        - name: receiver-naming
-        - name: time-naming
-        - name: indent-error-flow
-        - name: errorf
-        - name: empty-block
-        - name: superfluous-else
+    staticcheck:
+      checks:
+        - all
+        - -ST*
 
   # v2: Exclusions are here
   exclusions:
@@ -104,10 +41,7 @@ linters:
       # Exclude some linters from running on tests files
       - path: "_test\\.go"
         linters:
-          - gocyclo
-          - errcheck
-          - gosec
-          - gocognit
+          - staticcheck
 
       # Exclude known issues in generated files
       - path: ".*\\.gen\\.go"

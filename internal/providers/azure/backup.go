@@ -316,7 +316,7 @@ echo "Redis restored"
 `, backupPath)
 
 	if _, err := b.client.Execute(redisRestoreScript); err != nil {
-		return fmt.Errorf("Redis restore failed: %w", err)
+		return fmt.Errorf("redis restore failed: %w", err)
 	}
 
 	ui.Info("Verifying restore")

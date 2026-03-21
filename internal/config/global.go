@@ -60,9 +60,7 @@ func SaveGlobal(cfg *GlobalConfig) error {
 	// Save token to keyring
 	if cfg.CoolifyToken != "" {
 		if err := setToken("global-coolify-token", cfg.CoolifyToken); err != nil {
-			// Log error or handle failure
-			// For now, proceeding but keeping token in file if keyring fails could be a fallback
-			// But to enforce security, we proceed with keyring attempt.
+			return fmt.Errorf("failed to store global token in keyring: %w", err)
 		}
 	}
 

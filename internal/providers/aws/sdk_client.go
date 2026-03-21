@@ -287,16 +287,6 @@ func instanceToInfo(instance *types.Instance) *InstanceInfo {
 	return info
 }
 
-//go:fix inline
-func strPtr(s string) *string {
-	return new(s)
-}
-
-//go:fix inline
-func int32Ptr(i int32) *int32 {
-	return new(i)
-}
-
 func safeString(s *string) string {
 	if s == nil {
 		return ""

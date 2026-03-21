@@ -76,8 +76,8 @@ func runMainTUI(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func Execute(ctx context.Context, version, commit, date string) error {
-	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date)
+func Execute(ctx context.Context, version, commit, date, builtBy string) error {
+	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s, by: %s)", version, commit, date, builtBy)
 
 	return rootCmd.ExecuteContext(ctx)
 }

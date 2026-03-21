@@ -497,23 +497,22 @@ func (c *SDKClient) WaitForVM(name string, timeout time.Duration) error {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			if time.Now().After(deadline) {
-				return fmt.Errorf("timeout waiting for VM")
-			}
+	for now := range ticker.C {
+		if now.After(deadline) {
+			return fmt.Errorf("timeout waiting for VM")
+		}
 
-			vm, err := c.GetVM(name)
-			if err != nil {
-				continue
-			}
+		vm, err := c.GetVM(name)
+		if err != nil {
+			continue
+		}
 
-			if vm.State == "Succeeded" {
-				return nil
-			}
+		if vm.State == "Succeeded" {
+			return nil
 		}
 	}
+
+	return fmt.Errorf("timeout waiting for VM")
 }
 
 // DeleteResourceGroup deletes the entire resource group

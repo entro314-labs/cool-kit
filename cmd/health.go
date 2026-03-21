@@ -158,11 +158,9 @@ func runHealth(cmd *cobra.Command, args []string) error {
 	rows := [][]string{}
 
 	for _, c := range checks {
-		statusDisplay := c.status
+		statusDisplay := ui.DimStyle.Render(ui.IconDot + " " + c.status)
 		if c.ok {
 			statusDisplay = ui.SuccessStyle.Render(ui.IconSuccess + " " + c.status)
-		} else {
-			statusDisplay = ui.DimStyle.Render(ui.IconDot + " " + c.status)
 		}
 
 		rows = append(rows, []string{

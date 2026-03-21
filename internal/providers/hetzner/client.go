@@ -230,12 +230,17 @@ func (c *Client) AssignFloatingIP(serverID int64) (string, error) {
 
 // serverToInfo converts hcloud.Server to ServerInfo
 func serverToInfo(server *hcloud.Server) *ServerInfo {
+	location := ""
+	if server.Location != nil {
+		location = server.Location.Name
+	}
+
 	info := &ServerInfo{
 		ID:         server.ID,
 		Name:       server.Name,
 		Status:     string(server.Status),
 		ServerType: server.ServerType.Name,
-		Location:   server.Datacenter.Location.Name,
+		Location:   location,
 		Created:    server.Created,
 	}
 

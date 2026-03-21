@@ -10,16 +10,17 @@ import (
 )
 
 var (
-	version = "1.0.2"
+	version = "dev"
 	commit  = "none"
 	date    = "unknown"
+	builtBy = "unknown"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	if err := cmd.Execute(ctx, version, commit, date); err != nil {
+	if err := cmd.Execute(ctx, version, commit, date, builtBy); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

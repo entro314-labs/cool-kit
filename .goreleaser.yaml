@@ -26,6 +26,7 @@ before:
   hooks:
     - go mod tidy
     - go mod verify
+    - go test ./...
 
 # =============================================================================
 # Builds
@@ -50,6 +51,7 @@ builds:
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 # =============================================================================
@@ -106,19 +108,19 @@ changelog:
   sort: asc
   abbrev: 7
   groups:
-    - title: "🚀 Features"
+    - title: "Features"
       regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
       order: 0
-    - title: "🐛 Bug Fixes"
+    - title: "Bug Fixes"
       regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
       order: 1
-    - title: "📚 Documentation"
+    - title: "Documentation"
       regexp: '^.*?docs?(\([[:word:]]+\))??!?:.+$'
       order: 2
-    - title: "🔧 Performance & Refactors"
+    - title: "Performance & Refactors"
       regexp: '^.*?(perf|refactor)(\([[:word:]]+\))??!?:.+$'
       order: 3
-    - title: "📦 Dependencies"
+    - title: "Dependencies"
       regexp: '^.*?(build|deps?)(\([[:word:]]+\))??!?:.+$'
       order: 4
     - title: "Other Changes"
@@ -199,7 +201,7 @@ homebrew_casks:
     homepage: https://github.com/entro314-labs/cool-kit
     description: "CLI toolkit for Coolify deployments"
     license: MIT
-    skip_upload: "{{ .IsSnapshot }}"
+    skip_upload: '{{ or .IsSnapshot (eq .Env.HOMEBREW_TAP_TOKEN "") }}'
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
@@ -221,20 +223,31 @@ homebrew_casks:
 # =============================================================================
 winget:
   - name: cool-kit
+    ids:
+      - default
     package_identifier: Entro314Labs.CoolKit
     publisher: Entro314 Labs
+    publisher_url: https://github.com/entro314-labs
+    publisher_support_url: https://github.com/entro314-labs/cool-kit/issues
     short_description: "CLI toolkit for Coolify deployments"
+    description: "CLI toolkit for Coolify deployments"
+    homepage: https://github.com/entro314-labs/cool-kit
     license: MIT
     license_url: "https://github.com/entro314-labs/cool-kit/blob/main/LICENSE"
     copyright: "Entro314 Labs"
-    homepage: https://github.com/entro314-labs/cool-kit
-    description: "CLI toolkit for Coolify deployments"
-    skip_upload: "{{ .IsSnapshot }}"
+    skip_upload: '{{ or .IsSnapshot (eq .Env.WINGET_TOKEN "") }}'
     repository:
-      owner: microsoft
+      owner: entro314-labs
       name: winget-pkgs
-      branch: master
+      branch: "cool-kit-{{ .Version }}"
       token: "{{ .Env.WINGET_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+    commit_msg_template: "{{ .PackageIdentifier }}: {{ .Tag }}"
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
@@ -251,10 +264,13 @@ aurs:
     maintainers:
       - "entro314-labs"
     license: MIT
-    disable: "{{ .IsSnapshot }}"
-    skip_upload: "{{ .IsSnapshot }}"
+    disable: '{{ or .IsSnapshot (eq .Env.AUR_KEY "") }}'
     private_key: "{{ .Env.AUR_KEY }}"
     git_url: "ssh://aur@aur.archlinux.org/cool-kit-bin.git"
+    provides:
+      - cool-kit
+    conflicts:
+      - cool-kit
     package: |-
       # bin
       install -Dm755 "./cool-kit" "${pkgdir}/usr/bin/cool-kit"
@@ -328,9 +344,9 @@ dockers_v2:
 # =============================================================================
 # Docker Signing
 # =============================================================================
-docker_signs:
-  - artifacts: all
-    stdin: "{{ .Env.COSIGN_PWD }}"
+#docker_signs:
+#  - artifacts: all
+#    stdin: "{{ .Env.COSIGN_PWD }}"
 
 
 
@@ -350,13 +366,13 @@ sboms:
 # =============================================================================
 # Artifact Signing
 # =============================================================================
-signs:
-  - id: checksum-sign
-    artifacts: checksum
-    stdin: "{{ .Env.COSIGN_PWD }}"
-  - id: artifacts-sign
-    artifacts: all
-    stdin: "{{ .Env.COSIGN_PWD }}"
+#signs:
+#  - id: checksum-sign
+#    artifacts: checksum
+#    stdin: "{{ .Env.COSIGN_PWD }}"
+#  - id: artifacts-sign
+#    artifacts: all
+#    stdin: "{{ .Env.COSIGN_PWD }}"
 
 
 # =============================================================================

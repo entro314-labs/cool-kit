@@ -279,17 +279,3 @@ func instanceToVMInfo(instance *computepb.Instance) *VMInfo {
 	return info
 }
 
-//go:fix inline
-func strPtr(s string) *string {
-	return new(s)
-}
-
-//go:fix inline
-func boolPtr(b bool) *bool {
-	return new(b)
-}
-
-//go:fix inline
-func int64Ptr(i int64) *int64 {
-	return new(i)
-}

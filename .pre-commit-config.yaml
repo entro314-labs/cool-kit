@@ -1,56 +1,147 @@
-# Pre-commit hooks for cool-kit
-# Install: pre-commit install
-# Run all: pre-commit run --all-files
+# Pre-commit hooks configuration
+# https://pre-commit.com/
 
 repos:
-  # General file checks
+  # General code quality
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
       - id: check-yaml
         args: [--allow-multiple-documents]
+      - id: check-toml
       - id: check-json
-      - id: check-added-large-files
-        args: ['--maxkb=1000']
+      - id: check-xml
       - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
       - id: detect-private-key
       - id: mixed-line-ending
-        args: ['--fix=lf']
+        args: [--fix=lf]
 
-  # Go hooks
-  - repo: https://github.com/tekwizely/pre-commit-golang
-    rev: v1.0.0-rc.4
+  # Go specific hooks
+  - repo: local
     hooks:
-      - id: go-mod-tidy
-      - id: go-vet
-      - id: go-build-mod
+      # Go formatting
+      - id: go-fmt
+        name: go fmt
+        entry: gofmt
+        args: [-w]
+        language: system
+        files: \.go$
 
-  # golangci-lint
+      # Go imports
+      - id: go-imports
+        name: go imports
+        entry: goimports
+        args: [-w]
+        language: system
+        files: \.go$
+        require_serial: false
+
+      # Go mod tidy
+      - id: go-mod-tidy
+        name: go mod tidy
+        entry: go
+        args: [mod, tidy]
+        language: system
+        files: go\.(mod|sum)$
+        pass_filenames: false
+
+      # Go generate
+      - id: go-generate
+        name: go generate
+        entry: go
+        args: [generate, ./...]
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      # Go vet
+      - id: go-vet
+        name: go vet
+        entry: go
+        args: [vet, ./...]
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      # Go tests (fast)
+      - id: go-test-short
+        name: go test (short)
+        entry: go
+        args: [test, -short, ./...]
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      # Go build
+      - id: go-build
+        name: go build
+        entry: go
+        args: [build, -v, ./...]
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+  # Go linting with golangci-lint
   - repo: https://github.com/golangci/golangci-lint
     rev: v2.11.3
     hooks:
       - id: golangci-lint
-        args: [--timeout=5m]
+        args: [--fix]
+
+  # Security scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: .*\.lock$
 
   # Markdown
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.48.0
     hooks:
       - id: markdownlint
-        args: ['--fix', '--disable', 'MD013', 'MD033', 'MD041', '--']
+        args: [--fix]
+        files: \.md$
 
   # YAML
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.38.0
     hooks:
       - id: yamllint
-        args: [-c, .yamllint.yaml]
-        exclude: ^goreleaser/
+        args: [-c=.yamllint.yaml]
 
-  # Secrets detection
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.30.0
+  # Git commit message format
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
     hooks:
-      - id: gitleaks
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [--optional-scope]
+
+  # Docker
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.14.0
+    hooks:
+      - id: hadolint-docker
+        args: [--ignore, DL3008, --ignore, DL3009]
+
+# Configuration for pre-commit.ci
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

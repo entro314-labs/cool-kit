@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/entro314-labs/cool-kit/internal/config"
 )
 
 // Styles
@@ -37,14 +36,6 @@ var (
 				Background(lipgloss.Color("#EE6FF8")).
 				Padding(0, 3).
 				MarginTop(1)
-
-	statusStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#14F195")).
-			Bold(true)
-
-	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF5F87")).
-			Bold(true)
 )
 
 // State represents the current state of the UI
@@ -72,7 +63,6 @@ type Model struct {
 	state         State
 	Provider      string
 	Configuration map[string]string // Collected configuration
-	config        *config.Config
 
 	// Bubbles
 	list       list.Model
@@ -237,7 +227,7 @@ func (m *Model) setupInputs(provider string) {
 func (m *Model) collectConfiguration() {
 	// Map inputs back to known keys.
 	// In a real app, strict mapping would be better, but index-based mapping works for this wizard flow.
-	keys := []string{}
+	var keys []string
 
 	switch m.Provider {
 	case "azure":
@@ -275,7 +265,7 @@ func (m Model) renderConfiguration() string {
 
 	b.WriteString(titleStyle.Render("⚙️ Configure Deployment"))
 	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("Provider: %s\n\n", strings.ToUpper(m.Provider)))
+	fmt.Fprintf(&b, "Provider: %s\n\n", strings.ToUpper(m.Provider))
 
 	for i, input := range m.inputs {
 		b.WriteString(input.View())

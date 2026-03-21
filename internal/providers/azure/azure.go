@@ -172,13 +172,13 @@ func (p *AzureProvider) validateCredentials(progressChan chan<- ui.StepProgressM
 	if p.useSDK && p.sdkClient != nil {
 		progressChan <- ui.StepProgressMsg{Progress: 0.6, Message: "Validating SDK credentials"}
 		if err := p.sdkClient.ValidateCredentials(); err != nil {
-			return fmt.Errorf("Azure SDK validation failed: %w", err)
+			return fmt.Errorf("azure SDK validation failed: %w", err)
 		}
 		logChan <- ui.LogMsg{Level: ui.LogDebug, Message: "Azure SDK credentials validated"}
 	} else {
 		progressChan <- ui.StepProgressMsg{Progress: 0.6, Message: "Validating CLI credentials"}
 		if _, err := p.runAzCommand("account", "show"); err != nil {
-			return fmt.Errorf("Azure CLI not authenticated. Run 'az login': %w", err)
+			return fmt.Errorf("azure CLI not authenticated. run 'az login': %w", err)
 		}
 		logChan <- ui.LogMsg{Level: ui.LogDebug, Message: "Azure CLI credentials validated"}
 	}

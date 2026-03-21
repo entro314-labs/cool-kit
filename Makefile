@@ -19,7 +19,8 @@ PGO_PROFILE := default.pgo
 LDFLAGS := -s -w \
 	-X main.version=$(VERSION) \
 	-X main.commit=$(GIT_COMMIT) \
-	-X main.date=$(BUILD_TIME)
+	-X main.date=$(BUILD_TIME) \
+	-X main.builtBy=make
 
 # Output directories
 DIST_DIR := dist

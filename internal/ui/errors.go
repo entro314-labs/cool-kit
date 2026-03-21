@@ -225,7 +225,7 @@ func formatDeploymentError(de *DeploymentError) string {
 
 	// Error message
 	if de.Code != "" {
-		b.WriteString(fmt.Sprintf("[%s] %s", de.Code, de.Message))
+		fmt.Fprintf(&b, "[%s] %s", de.Code, de.Message)
 	} else {
 		b.WriteString(de.Message)
 	}
