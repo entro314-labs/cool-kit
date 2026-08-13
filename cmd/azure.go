@@ -136,5 +136,4 @@ func init() {
 	azureCmd.AddCommand(azureSSHCmd)
 
 	// Add azure command to root
-	rootCmd.AddCommand(azureCmd)
 }

@@ -43,3 +43,12 @@ func getToken(key string) (string, error) {
 	return string(item.Data), nil
 }
 
+// deleteToken removes a token from keyring.
+func deleteToken(key string) error {
+	kr, err := getKeyring()
+	if err != nil {
+		return err
+	}
+
+	return kr.Remove(key)
+}

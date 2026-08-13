@@ -194,8 +194,8 @@ func (s *deploymentService) deployBareMetal(progressChan chan<- ui.StepProgressM
 		return "", err
 	}
 
-	host, ok := s.config.Settings["baremetal_host"].(string)
-	if !ok {
+	host := s.config.BareMetal.Host
+	if host == "" {
 		host = "your-server-ip"
 	}
 

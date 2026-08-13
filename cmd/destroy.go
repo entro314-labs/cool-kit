@@ -41,7 +41,6 @@ func init() {
 	destroyCmd.Flags().BoolVar(&destroyAll, "all", false, "Destroy based on last deployment provider")
 	destroyCmd.Flags().StringVar(&destroyResourceGroup, "resource-group", "", "Azure resource group to delete")
 
-	rootCmd.AddCommand(destroyCmd)
 }
 
 func runDestroy(cmd *cobra.Command, args []string) error {
@@ -53,6 +52,9 @@ func runDestroy(cmd *cobra.Command, args []string) error {
 		provider = strings.ToLower(args[0])
 	} else if destroyAll {
 		cfg := config.Get()
+		if cfg == nil {
+			return fmt.Errorf("configuration not initialized")
+		}
 		provider = cfg.Provider
 		if provider == "" {
 			return fmt.Errorf("no provider specified and no last deployment found")
@@ -82,6 +84,9 @@ func runDestroy(cmd *cobra.Command, args []string) error {
 
 func destroyAzure() error {
 	cfg := config.Get()
+	if cfg == nil {
+		return fmt.Errorf("configuration not initialized")
+	}
 	rgName := destroyResourceGroup
 	if rgName == "" {
 		rgName = cfg.Azure.ResourceGroup
@@ -147,6 +152,9 @@ func destroyAzure() error {
 
 func destroyAWS() error {
 	cfg := config.Get()
+	if cfg == nil {
+		return fmt.Errorf("configuration not initialized")
+	}
 
 	// Get instance ID from settings
 	var instanceID string
@@ -163,8 +171,8 @@ func destroyAWS() error {
 	}
 
 	region := "us-east-1"
-	if r, ok := cfg.Settings["aws_region"].(string); ok {
-		region = r
+	if cfg.AWS.Region != "" {
+		region = cfg.AWS.Region
 	}
 
 	ui.Info(fmt.Sprintf("Instance: %s (Region: %s)", instanceID, region))
@@ -202,25 +210,28 @@ func destroyAWS() error {
 
 func destroyGCP() error {
 	cfg := config.Get()
+	if cfg == nil {
+		return fmt.Errorf("configuration not initialized")
+	}
 
 	var instanceName, zone, project string
 	if cfg.Settings != nil {
-		if n, ok := cfg.Settings["gcp_instance"].(string); ok {
+		if n, ok := cfg.Settings["gcp_instance_name"].(string); ok {
 			instanceName = n
-		}
-		if z, ok := cfg.Settings["gcp_zone"].(string); ok {
-			zone = z
-		}
-		if p, ok := cfg.Settings["gcp_project"].(string); ok {
-			project = p
 		}
 	}
 
 	if instanceName == "" {
-		instanceName = "coolify-vm"
+		instanceName = "coolify-instance"
+	}
+	if zone == "" {
+		zone = cfg.GCP.Zone
 	}
 	if zone == "" {
 		zone = "us-central1-a"
+	}
+	if project == "" {
+		project = cfg.GCP.Project
 	}
 
 	ui.Info(fmt.Sprintf("Instance: %s (Zone: %s)", instanceName, zone))
@@ -253,6 +264,9 @@ func destroyGCP() error {
 
 func destroyHetzner() error {
 	cfg := config.Get()
+	if cfg == nil {
+		return fmt.Errorf("configuration not initialized")
+	}
 
 	var serverID string
 	if cfg.Settings != nil {
@@ -294,6 +308,9 @@ func destroyHetzner() error {
 
 func destroyDigitalOcean() error {
 	cfg := config.Get()
+	if cfg == nil {
+		return fmt.Errorf("configuration not initialized")
+	}
 
 	var dropletID string
 	if cfg.Settings != nil {

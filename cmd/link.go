@@ -26,7 +26,7 @@ func runLink(cmd *cobra.Command, args []string) error {
 	ui.Section("Link Project")
 
 	// Check if already linked
-	if config.ProjectExists() {
+	if config.HasProject() {
 		ui.Warning("This directory is already linked to a project")
 		ui.Spacer()
 		overwrite, err := ui.Confirm("Overwrite existing configuration?")
@@ -40,12 +40,10 @@ func runLink(cmd *cobra.Command, args []string) error {
 		ui.Spacer()
 	}
 
-	globalCfg, err := config.LoadGlobal()
+	client, _, err := getCurrentCoolifyClient()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return err
 	}
-
-	client := api.NewClient(globalCfg.CoolifyURL, globalCfg.CoolifyToken)
 
 	// List applications
 	ui.Info("Loading applications...")

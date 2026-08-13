@@ -4,6 +4,7 @@ package azure
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -417,22 +418,38 @@ func (p *AzureProvider) waitForVM(progressChan chan<- ui.StepProgressMsg, logCha
 		}
 		p.config.Settings["public_ip"] = ip
 	} else {
-		// CLI - get IP
-		time.Sleep(30 * time.Second) // Wait for provisioning
+		// CLI fallback - poll until public IP is available.
+		var publicIP string
+		for attempt := 1; attempt <= 60; attempt++ {
+			progress := 0.3 + (float64(attempt) / 60.0 * 0.5)
+			progressChan <- ui.StepProgressMsg{
+				Progress: progress,
+				Message:  fmt.Sprintf("Waiting for VM IP assignment (attempt %d/60)", attempt),
+			}
 
-		progressChan <- ui.StepProgressMsg{Progress: 0.7, Message: "Getting public IP"}
-		output, err := p.runAzCommand("vm", "list-ip-addresses",
-			"--resource-group", p.config.Azure.ResourceGroup,
-			"--name", vmName,
-			"--query", "[0].virtualMachine.network.publicIpAddresses[0].ipAddress",
-			"--output", "tsv")
-		if err != nil {
-			return fmt.Errorf("failed to get VM IP: %w", err)
+			output, err := p.runAzCommand("vm", "list-ip-addresses",
+				"--resource-group", p.config.Azure.ResourceGroup,
+				"--name", vmName,
+				"--query", "[0].virtualMachine.network.publicIpAddresses[0].ipAddress",
+				"--output", "tsv")
+			if err == nil {
+				publicIP = strings.TrimSpace(output)
+				if publicIP != "" {
+					break
+				}
+			}
+			time.Sleep(5 * time.Second)
 		}
-		p.config.Settings["public_ip"] = strings.TrimSpace(output)
+		if publicIP == "" {
+			return fmt.Errorf("failed to get VM public IP after waiting for provisioning")
+		}
+		p.config.Settings["public_ip"] = publicIP
 	}
 
-	publicIP := p.config.Settings["public_ip"].(string)
+	publicIP, ok := p.config.Settings["public_ip"].(string)
+	if !ok || publicIP == "" {
+		return fmt.Errorf("public IP not found after VM provisioning")
+	}
 	logChan <- ui.LogMsg{Level: ui.LogInfo, Message: fmt.Sprintf("VM public IP: %s", publicIP)}
 	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "VM ready"}
 	return nil
@@ -489,27 +506,39 @@ func (p *AzureProvider) deployCoolify(progressChan chan<- ui.StepProgressMsg, lo
 // runHealthChecks performs health checks
 func (p *AzureProvider) runHealthChecks(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
 	publicIP, ok := p.config.Settings["public_ip"].(string)
-	if !ok {
+	if !ok || publicIP == "" {
 		return fmt.Errorf("public IP not found")
 	}
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Checking HTTP endpoint"}
+	httpURL := fmt.Sprintf("http://%s:8000", publicIP)
+	httpClient := &http.Client{Timeout: 10 * time.Second}
 
-	time.Sleep(10 * time.Second)
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.3 + (float64(attempt) / 20.0 * 0.6)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Waiting for endpoint readiness (attempt %d/20)", attempt),
+		}
 
-	curlCmd := exec.Command("curl", "-f", "-s", "-o", "/dev/null", "--max-time", "10",
-		fmt.Sprintf("http://%s:8000", publicIP))
-
-	if err := curlCmd.Run(); err != nil {
-		logChan <- ui.LogMsg{Level: ui.LogWarning, Message: "HTTP check failed (Coolify may need more time to start)"}
-	} else {
-		logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Coolify is responding on port 8000"}
+		resp, err := httpClient.Get(httpURL)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+				logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: fmt.Sprintf("Coolify is responding on %s", httpURL)}
+				progressChan <- ui.StepProgressMsg{Progress: 0.95, Message: "Health checks complete"}
+				logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: fmt.Sprintf("Coolify available at: %s", httpURL)}
+				return nil
+			}
+			lastErr = fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
+		} else {
+			lastErr = err
+		}
+		time.Sleep(10 * time.Second)
 	}
 
-	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Health checks complete"}
-	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: fmt.Sprintf("🚀 Coolify available at: http://%s:8000", publicIP)}
-
-	return nil
+	return fmt.Errorf("Coolify endpoint did not become reachable at %s: %w", httpURL, lastErr)
 }
 
 // getCloudInit returns the cloud-init script

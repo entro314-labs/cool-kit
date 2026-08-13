@@ -3,7 +3,11 @@ package aws
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/entro314-labs/cool-kit/internal/config"
@@ -246,10 +250,14 @@ func (p *AWSProvider) launchInstance(progressChan chan<- ui.StepProgressMsg, log
 
 	instanceType := p.getInstanceType()
 	ami := p.getAMI()
+	keyName := p.getKeyName()
+	if keyName == "" {
+		return fmt.Errorf("AWS key pair name is required for SSH deployment (set aws.key_name)")
+	}
 
 	logChan <- ui.LogMsg{
 		Level:   ui.LogInfo,
-		Message: fmt.Sprintf("Instance type: %s, AMI: %s", instanceType, ami),
+		Message: fmt.Sprintf("Instance type: %s, AMI: %s, key pair: %s", instanceType, ami, keyName),
 	}
 
 	// Use SDK client to create instance
@@ -257,6 +265,7 @@ func (p *AWSProvider) launchInstance(progressChan chan<- ui.StepProgressMsg, log
 		Name:         "coolify-instance",
 		InstanceType: instanceType,
 		AMI:          ami,
+		KeyName:      keyName,
 		DiskSizeGB:   30,
 	}
 
@@ -313,6 +322,14 @@ func (p *AWSProvider) installDocker(progressChan chan<- ui.StepProgressMsg, logC
 	if !ok || publicIP == "" {
 		return fmt.Errorf("public IP not found")
 	}
+	keyPath, err := p.getSSHPrivateKeyPath()
+	if err != nil {
+		return err
+	}
+
+	if err := p.waitForSSH(publicIP, keyPath, 24, 5*time.Second); err != nil {
+		return fmt.Errorf("SSH did not become available: %w", err)
+	}
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.4, Message: "Installing Docker"}
 
@@ -322,17 +339,17 @@ func (p *AWSProvider) installDocker(progressChan chan<- ui.StepProgressMsg, logC
 	logChan <- ui.LogMsg{Level: ui.LogInfo, Message: fmt.Sprintf("Installing Docker via SSH on %s", publicIP)}
 
 	// Execute via SSH
-	cmd := exec.Command("ssh",
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-o", "ConnectTimeout=30",
-		fmt.Sprintf("ubuntu@%s", publicIP),
-		installScript,
-	)
+	cmd := p.newSSHCommand(publicIP, keyPath, installScript)
 
 	if output, err := cmd.CombinedOutput(); err != nil {
 		logChan <- ui.LogMsg{Level: ui.LogWarning, Message: string(output)}
 		return fmt.Errorf("failed to install Docker via SSH: %w", err)
+	}
+
+	verifyCmd := p.newSSHCommand(publicIP, keyPath, "docker --version && docker info >/dev/null")
+	if output, err := verifyCmd.CombinedOutput(); err != nil {
+		logChan <- ui.LogMsg{Level: ui.LogWarning, Message: string(output)}
+		return fmt.Errorf("Docker installation verification failed: %w", err)
 	}
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.8, Message: "Docker installed"}
@@ -350,6 +367,10 @@ func (p *AWSProvider) deployCoolify(progressChan chan<- ui.StepProgressMsg, logC
 	if !ok || publicIP == "" {
 		return fmt.Errorf("public IP not found")
 	}
+	keyPath, err := p.getSSHPrivateKeyPath()
+	if err != nil {
+		return err
+	}
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.4, Message: "Running Coolify install script"}
 
@@ -361,14 +382,7 @@ curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash`
 
 	logChan <- ui.LogMsg{Level: ui.LogInfo, Message: fmt.Sprintf("Deploying Coolify via SSH on %s", publicIP)}
 
-	cmd := exec.Command("ssh",
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-o", "ConnectTimeout=60",
-		fmt.Sprintf("ubuntu@%s", publicIP),
-		installScript,
-	)
-
+	cmd := p.newSSHCommand(publicIP, keyPath, installScript)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		logChan <- ui.LogMsg{Level: ui.LogWarning, Message: string(output)}
 		return fmt.Errorf("failed to deploy Coolify via SSH: %w", err)
@@ -395,37 +409,131 @@ func (p *AWSProvider) runHealthChecks(progressChan chan<- ui.StepProgressMsg, lo
 	progressChan <- ui.StepProgressMsg{Progress: 0.2, Message: "Checking HTTP endpoint"}
 
 	publicIP, ok := p.config.Settings["public_ip"].(string)
-	if !ok {
+	if !ok || publicIP == "" {
 		return fmt.Errorf("public IP not found")
 	}
 
-	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Checking WebSocket"}
+	httpURL := fmt.Sprintf("http://%s:8000", publicIP)
+	wsURL := fmt.Sprintf("http://%s:6001", publicIP)
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+
 	logChan <- ui.LogMsg{Level: ui.LogInfo, Message: fmt.Sprintf("Running health checks on %s", publicIP)}
 
-	// Simulate health checks
-	time.Sleep(3 * time.Second)
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.2 + (float64(attempt) / 20.0 * 0.55)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Waiting for Coolify endpoint (attempt %d/20)", attempt),
+		}
 
-	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "All checks passed"}
-	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Health checks passed"}
+		resp, err := httpClient.Get(httpURL)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+				lastErr = nil
+				break
+			}
+			lastErr = fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
+		} else {
+			lastErr = err
+		}
+
+		time.Sleep(15 * time.Second)
+	}
+	if lastErr != nil {
+		return fmt.Errorf("Coolify endpoint did not become reachable at %s: %w", httpURL, lastErr)
+	}
+
+	progressChan <- ui.StepProgressMsg{Progress: 0.8, Message: "Checking WebSocket endpoint"}
+	if resp, err := httpClient.Get(wsURL); err == nil {
+		_ = resp.Body.Close()
+		logChan <- ui.LogMsg{Level: ui.LogInfo, Message: "WebSocket endpoint responded"}
+	} else {
+		logChan <- ui.LogMsg{Level: ui.LogWarning, Message: fmt.Sprintf("WebSocket endpoint check failed: %v", err)}
+	}
+
+	progressChan <- ui.StepProgressMsg{Progress: 0.95, Message: "All checks passed"}
+	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: fmt.Sprintf("Health checks passed (%s)", httpURL)}
 	return nil
 }
 
 // Helper methods
 func (p *AWSProvider) getRegion() string {
-	if region, ok := p.config.Settings["aws_region"].(string); ok {
+	if region := strings.TrimSpace(p.config.AWS.Region); region != "" {
 		return region
 	}
 	return "us-east-1"
 }
 
 func (p *AWSProvider) getInstanceType() string {
-	if instanceType, ok := p.config.Settings["aws_instance_type"].(string); ok {
+	if instanceType := strings.TrimSpace(p.config.AWS.InstanceType); instanceType != "" {
 		return instanceType
 	}
 	return "t3.medium"
 }
 
 func (p *AWSProvider) getAMI() string {
-	// Ubuntu 24.04 LTS in us-east-1 (noble)
+	if ami := strings.TrimSpace(p.config.AWS.AMI); ami != "" {
+		return ami
+	}
 	return "ami-04b70fa74e45c3917"
+}
+
+func (p *AWSProvider) getKeyName() string {
+	if keyName := strings.TrimSpace(p.config.AWS.KeyName); keyName != "" {
+		return keyName
+	}
+	return ""
+}
+
+func (p *AWSProvider) getSSHPrivateKeyPath() (string, error) {
+	keyPath := strings.TrimSpace(p.config.AWS.SSHKeyPath)
+	if keyPath == "" {
+		return "", fmt.Errorf("AWS SSH key path is required (set aws.ssh_key_path)")
+	}
+
+	if strings.HasPrefix(keyPath, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve home directory for SSH key: %w", err)
+		}
+		keyPath = filepath.Join(home, strings.TrimPrefix(keyPath, "~/"))
+	}
+	keyPath = strings.TrimSuffix(keyPath, ".pub")
+	if _, err := os.Stat(keyPath); err != nil {
+		return "", fmt.Errorf("AWS SSH private key not found at %s: %w", keyPath, err)
+	}
+
+	return keyPath, nil
+}
+
+func (p *AWSProvider) newSSHCommand(publicIP, keyPath, remoteCommand string) *exec.Cmd {
+	return exec.Command(
+		"ssh",
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "ConnectTimeout=30",
+		"-i", keyPath,
+		fmt.Sprintf("ubuntu@%s", publicIP),
+		remoteCommand,
+	)
+}
+
+func (p *AWSProvider) waitForSSH(publicIP, keyPath string, maxAttempts int, retryDelay time.Duration) error {
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		cmd := p.newSSHCommand(publicIP, keyPath, "echo 'SSH ready'")
+		if output, err := cmd.CombinedOutput(); err == nil {
+			if strings.Contains(string(output), "SSH ready") {
+				return nil
+			}
+			lastErr = fmt.Errorf("unexpected SSH readiness output: %s", strings.TrimSpace(string(output)))
+		} else {
+			lastErr = err
+		}
+		time.Sleep(retryDelay)
+	}
+
+	return fmt.Errorf("SSH did not become available after %d attempts: %w", maxAttempts, lastErr)
 }

@@ -133,7 +133,7 @@ func (c *SDKClient) EnsureResourceGroup() error {
 	_, err = c.resourcesClient.CreateOrUpdate(c.ctx, c.resourceGroup, armresources.ResourceGroup{
 		Location: new(c.location),
 		Tags: map[string]*string{
-			"createdby":   new("coolify-cli"),
+			"createdby":   new("cool-kit"),
 			"environment": new("production"),
 		},
 	}, nil)
@@ -184,7 +184,7 @@ func (c *SDKClient) EnsureNSG(opts NSGCreateOpts) (string, error) {
 				SecurityRules: rules,
 			},
 			Tags: map[string]*string{
-				"createdby": new("coolify-cli"),
+				"createdby": new("cool-kit"),
 			},
 		}, nil)
 
@@ -226,7 +226,7 @@ func (c *SDKClient) EnsureVNet(vnetName, subnetName string) (string, error) {
 				},
 			},
 			Tags: map[string]*string{
-				"createdby": new("coolify-cli"),
+				"createdby": new("cool-kit"),
 			},
 		}, nil)
 
@@ -265,7 +265,7 @@ func (c *SDKClient) CreatePublicIP(name string) (string, error) {
 				Name: to.Ptr(armnetwork.PublicIPAddressSKUNameStandard),
 			},
 			Tags: map[string]*string{
-				"createdby": new("coolify-cli"),
+				"createdby": new("cool-kit"),
 			},
 		}, nil)
 
@@ -312,7 +312,7 @@ func (c *SDKClient) CreateNIC(name, subnetID, publicIPID, nsgID string) (string,
 				},
 			},
 			Tags: map[string]*string{
-				"createdby": new("coolify-cli"),
+				"createdby": new("cool-kit"),
 			},
 		}, nil)
 
@@ -414,7 +414,7 @@ func (c *SDKClient) CreateVM(opts VMCreateOpts) (*VMInfo, error) {
 				},
 			},
 			Tags: map[string]*string{
-				"createdby":   new("coolify-cli"),
+				"createdby":   new("cool-kit"),
 				"application": new("coolify"),
 			},
 		}, nil)

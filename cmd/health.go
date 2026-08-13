@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/entro314-labs/cool-kit/internal/api"
 	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/docker"
 	"github.com/entro314-labs/cool-kit/internal/git"
@@ -22,7 +21,7 @@ var healthCmd = &cobra.Command{
 func runHealth(cmd *cobra.Command, args []string) error {
 	cfg, err := config.LoadGlobal()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to load global integrations: %w", err)
 	}
 
 	ui.Section("Health Check")
@@ -37,22 +36,33 @@ func runHealth(cmd *cobra.Command, args []string) error {
 	checks := []check{}
 	allHealthy := true
 
-	// Check Coolify
-	if cfg.CoolifyURL == "" || cfg.CoolifyToken == "" {
+	// Check Coolify (instance-aware)
+	if err := checkLogin(); err != nil {
 		checks = append(checks, check{
 			name:   "Coolify",
 			status: "Not configured",
-			detail: cfg.CoolifyURL,
+			detail: "-",
 			ok:     false,
 		})
 		allHealthy = false
 	} else {
-		client := api.NewClient(cfg.CoolifyURL, cfg.CoolifyToken)
+		client, instance, err := getCurrentCoolifyClient()
+		if err != nil {
+			checks = append(checks, check{
+				name:   "Coolify",
+				status: "Not configured",
+				detail: "-",
+				ok:     false,
+			})
+			allHealthy = false
+			goto globalChecks
+		}
+
 		if err := client.HealthCheck(cmd.Context()); err != nil {
 			checks = append(checks, check{
 				name:   "Coolify",
 				status: "Connection failed",
-				detail: cfg.CoolifyURL,
+				detail: instance.FQDN,
 				ok:     false,
 			})
 			allHealthy = false
@@ -60,12 +70,13 @@ func runHealth(cmd *cobra.Command, args []string) error {
 			checks = append(checks, check{
 				name:   "Coolify",
 				status: "Connected",
-				detail: cfg.CoolifyURL,
+				detail: instance.FQDN,
 				ok:     true,
 			})
 		}
 	}
 
+globalChecks:
 	// Check GitHub
 	if cfg.GitHubToken == "" {
 		checks = append(checks, check{

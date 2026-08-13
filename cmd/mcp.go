@@ -7,8 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/entro314-labs/cool-kit/internal/api"
-	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/mcp"
 	"github.com/entro314-labs/cool-kit/internal/ui"
 )
@@ -49,29 +47,18 @@ Available tools exposed via MCP:
 }
 
 func init() {
-	rootCmd.AddCommand(mcpCmd)
 }
 
 func runMCP(ctx context.Context) error {
-	// Load global config to get Coolify connection
-	globalCfg, err := config.LoadGlobal()
+	client, instance, err := getCurrentCoolifyClient()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: Not logged in. Run 'cool-kit login' first.")
 		return err
 	}
 
-	// Check required fields
-	if globalCfg.CoolifyURL == "" || globalCfg.CoolifyToken == "" {
-		fmt.Fprintln(os.Stderr, "Error: Coolify URL or token not configured. Run 'cool-kit login' first.")
-		return fmt.Errorf("missing URL or token")
-	}
-
-	// Create API client
-	client := api.NewClient(globalCfg.CoolifyURL, globalCfg.CoolifyToken)
-
 	// Verify connection
 	if err := client.HealthCheck(ctx); err != nil {
-		ui.Error(fmt.Sprintf("Failed to connect to Coolify: %v", err))
+		ui.Error(fmt.Sprintf("Failed to connect to Coolify instance %q: %v", instance.Name, err))
 		return err
 	}
 

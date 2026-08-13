@@ -112,7 +112,6 @@ func init() {
 	dockerCmd.AddCommand(dockerStopCmd)
 
 	// Add docker command to root
-	rootCmd.AddCommand(dockerCmd)
 }
 
 func runDockerDeploy(profile string, useTUI bool) error {

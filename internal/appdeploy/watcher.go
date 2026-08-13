@@ -24,7 +24,7 @@ const (
 func WatchDeployment(ctx context.Context, client *api.Client, appUUID string) bool {
 	ui.Spacer()
 
-	debug := os.Getenv("CDP_DEBUG") != ""
+	debug := os.Getenv("COOLKIT_DEBUG") != "" || os.Getenv("CDP_DEBUG") != ""
 	if debug {
 		fmt.Printf("[DEBUG] Watching app UUID: %s\n", appUUID)
 	}

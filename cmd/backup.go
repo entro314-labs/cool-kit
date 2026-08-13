@@ -43,7 +43,6 @@ func init() {
 	backupCmd.Flags().BoolVar(&backupIncludeVolumes, "include-volumes", true, "Include Docker volumes from running containers")
 	backupCmd.Flags().BoolVar(&backupStopDocker, "stop-docker", false, "Stop Docker before backup (recommended for consistency)")
 
-	rootCmd.AddCommand(backupCmd)
 }
 
 func runBackup(cmd *cobra.Command, args []string) error {

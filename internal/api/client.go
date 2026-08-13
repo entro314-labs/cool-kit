@@ -77,26 +77,12 @@ func WithTimeout(timeout time.Duration) ClientOption {
 
 // NewClient creates a new Coolify API client with optional configuration
 func NewClient(baseURL, token string, opts ...ClientOption) *Client {
-	// Ensure baseURL doesn't have trailing slash
-	baseURL = strings.TrimSuffix(baseURL, "/")
-	// Ensure it has /api/v1 suffix
-	if !strings.HasSuffix(baseURL, "/api/v1") {
-		baseURL = baseURL + "/api/v1"
-	}
-
-	parsedURL, err := url.Parse(baseURL)
-	if err != nil {
-		// Fall back to simple URL if parsing fails
-		parsedURL = &url.URL{
-			Scheme: "https",
-			Host:   baseURL,
-		}
-	}
+	parsedURL := normalizeBaseURL(baseURL)
 
 	client := &Client{
 		BaseURL: parsedURL,
 		token:   token,
-		debug:   os.Getenv("CDP_DEBUG") != "",
+		debug:   os.Getenv("COOLKIT_DEBUG") != "" || os.Getenv("CDP_DEBUG") != "",
 		retries: DefaultRetries,
 		timeout: DefaultTimeout,
 		httpClient: &http.Client{
@@ -112,6 +98,75 @@ func NewClient(baseURL, token string, opts ...ClientOption) *Client {
 	return client
 }
 
+func normalizeBaseURL(raw string) *url.URL {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		raw = "https://localhost"
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+
+	parsedURL, err := url.Parse(raw)
+	if err != nil || parsedURL.Host == "" {
+		host := strings.TrimPrefix(strings.TrimPrefix(raw, "https://"), "http://")
+		host = strings.TrimSuffix(host, "/")
+		parsedURL = &url.URL{
+			Scheme: "https",
+			Host:   host,
+		}
+	}
+
+	basePath := strings.TrimSuffix(parsedURL.Path, "/")
+	if basePath == "" {
+		basePath = "/api/v1"
+	} else if !strings.HasSuffix(basePath, "/api/v1") {
+		basePath = basePath + "/api/v1"
+	}
+
+	parsedURL.Path = basePath
+	parsedURL.RawPath = ""
+	parsedURL.RawQuery = ""
+	parsedURL.Fragment = ""
+
+	return parsedURL
+}
+
+func buildRequestURL(base *url.URL, requestPath string) (string, error) {
+	if base == nil {
+		return "", fmt.Errorf("base URL is not configured")
+	}
+	if requestPath == "" {
+		return base.String(), nil
+	}
+
+	parsedPath, err := url.Parse(requestPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid request path %q: %w", requestPath, err)
+	}
+	if parsedPath.IsAbs() {
+		return parsedPath.String(), nil
+	}
+
+	u := *base
+	basePath := strings.TrimSuffix(u.Path, "/")
+	requestSegment := strings.TrimPrefix(parsedPath.Path, "/")
+
+	switch {
+	case requestSegment == "":
+		u.Path = basePath
+	case basePath == "":
+		u.Path = "/" + requestSegment
+	default:
+		u.Path = basePath + "/" + requestSegment
+	}
+
+	u.RawQuery = parsedPath.RawQuery
+	u.Fragment = parsedPath.Fragment
+
+	return u.String(), nil
+}
+
 // Default configuration values
 const (
 	DefaultRetries = 3
@@ -122,7 +177,7 @@ const (
 
 // doRequest performs an HTTP request with context support (CAGC pattern)
 func (c *Client) doRequest(ctx context.Context, method, path string, body any, v any) error {
-	u, err := c.BaseURL.Parse(path)
+	u, err := buildRequestURL(c.BaseURL, path)
 	if err != nil {
 		return err
 	}
@@ -135,7 +190,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, v
 		}
 	}
 
-	return c.doWithRetry(ctx, method, u.String(), reqBody, v)
+	return c.doWithRetry(ctx, method, u, reqBody, v)
 }
 
 // doWithRetry executes request with exponential backoff

@@ -43,7 +43,7 @@ func (p *BareMetalProvider) GetDeploymentSteps() []ui.DeploymentStep {
 		{Name: "Check system requirements", Description: "Verifying OS and dependencies"},
 		{Name: "Clone Coolify repository", Description: "Fetching latest Coolify from GitHub"},
 		{Name: "Install Docker", Description: "Installing Docker Engine"},
-		{Name: "Install Docker Compose", Description: "Installing Docker Compose"},
+		{Name: "Ensure Docker Compose plugin", Description: "Installing Docker Compose v2 when needed"},
 		{Name: "Configure environment", Description: "Setting up Coolify configuration"},
 		{Name: "Deploy Coolify", Description: "Starting Coolify services"},
 		{Name: "Run health checks", Description: "Validating deployment"},
@@ -60,7 +60,7 @@ func (p *BareMetalProvider) Deploy(progressChan chan<- ui.StepProgressMsg, logCh
 		{"Check system requirements", p.checkRequirements},
 		{"Clone Coolify repository", p.cloneRepository},
 		{"Install Docker", p.installDocker},
-		{"Install Docker Compose", p.installDockerCompose},
+		{"Ensure Docker Compose plugin", p.installDockerCompose},
 		{"Configure environment", p.configureEnvironment},
 		{"Deploy Coolify", p.deployCoolify},
 		{"Run health checks", p.runHealthChecks},
@@ -185,22 +185,43 @@ func (p *BareMetalProvider) installDocker(progressChan chan<- ui.StepProgressMsg
 
 // installDockerCompose installs Docker Compose
 func (p *BareMetalProvider) installDockerCompose(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
-	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Installing Docker Compose"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.2, Message: "Checking Docker Compose"}
 
 	host := p.getHost()
 	user := p.getUser()
 
-	installScript := `
-		sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-		sudo chmod +x /usr/local/bin/docker-compose
-	`
-
-	cmd := p.sshCommand(host, user, installScript)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to install Docker Compose: %w", err)
+	cmd := p.sshCommand(host, user, "docker compose version")
+	if err := cmd.Run(); err == nil {
+		logChan <- ui.LogMsg{Level: ui.LogInfo, Message: "Docker Compose plugin already installed"}
+		progressChan <- ui.StepProgressMsg{Progress: 1.0, Message: "Docker Compose plugin ready"}
+		return nil
 	}
 
-	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Docker Compose installed"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Installing Docker Compose plugin"}
+
+	installScript := `
+		set -e
+		if command -v apt-get >/dev/null 2>&1; then
+			sudo apt-get update
+			sudo apt-get install -y docker-compose-plugin
+		elif command -v dnf >/dev/null 2>&1; then
+			sudo dnf install -y docker-compose-plugin
+		elif command -v yum >/dev/null 2>&1; then
+			sudo yum install -y docker-compose-plugin
+		else
+			mkdir -p ~/.docker/cli-plugins
+			curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o ~/.docker/cli-plugins/docker-compose
+			chmod +x ~/.docker/cli-plugins/docker-compose
+		fi
+		docker compose version >/dev/null
+	`
+
+	cmd = p.sshCommand(host, user, installScript)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to install Docker Compose plugin: %w", err)
+	}
+
+	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Docker Compose plugin ready"}
 	return nil
 }
 
@@ -234,13 +255,36 @@ func (p *BareMetalProvider) deployCoolify(progressChan chan<- ui.StepProgressMsg
 	user := p.getUser()
 
 	// Start Coolify with Docker Compose
-	cmd := p.sshCommand(host, user, "cd ~/coolify && docker-compose up -d")
+	cmd := p.sshCommand(host, user, "cd ~/coolify && docker compose up -d")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to start Coolify: %w", err)
 	}
 
-	progressChan <- ui.StepProgressMsg{Progress: 0.6, Message: "Waiting for services to start"}
-	time.Sleep(30 * time.Second)
+	progressChan <- ui.StepProgressMsg{Progress: 0.6, Message: "Verifying running services"}
+
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.6 + (float64(attempt) / 20.0 * 0.25)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Checking service status (attempt %d/20)", attempt),
+		}
+		checkCmd := p.sshCommand(host, user, "cd ~/coolify && docker compose ps --status running --services")
+		output, err := checkCmd.Output()
+		if err == nil && strings.TrimSpace(string(output)) != "" {
+			lastErr = nil
+			break
+		}
+		if err != nil {
+			lastErr = err
+		} else {
+			lastErr = fmt.Errorf("no running services reported")
+		}
+		time.Sleep(5 * time.Second)
+	}
+	if lastErr != nil {
+		return fmt.Errorf("services did not become ready: %w", lastErr)
+	}
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Coolify deployed"}
 	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Coolify deployment complete"}
@@ -252,12 +296,13 @@ func (p *BareMetalProvider) runHealthChecks(progressChan chan<- ui.StepProgressM
 	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Running health checks"}
 
 	host := p.getHost()
-	httpURL := fmt.Sprintf("http://%s", host)
+	httpURL := fmt.Sprintf("http://%s:8000", host)
 	wsURL := fmt.Sprintf("http://%s:6001", host)
 
-	if err := p.health.ComprehensiveCheck(context.TODO(), httpURL, wsURL); err != nil {
-		return fmt.Errorf("health checks failed: %w", err)
+	if err := p.health.WaitForHTTP(context.TODO(), httpURL, 20, 10*time.Second); err != nil {
+		return fmt.Errorf("HTTP health checks failed: %w", err)
 	}
+	_ = p.health.CheckWebSocket(context.TODO(), wsURL, 5*time.Second)
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "All checks passed"}
 	return nil
@@ -265,19 +310,27 @@ func (p *BareMetalProvider) runHealthChecks(progressChan chan<- ui.StepProgressM
 
 // Helper methods
 func (p *BareMetalProvider) getHost() string {
-	if host, ok := p.config.Settings["baremetal_host"].(string); ok {
+	if host := strings.TrimSpace(p.config.BareMetal.Host); host != "" {
 		return host
 	}
 	return "localhost"
 }
 
 func (p *BareMetalProvider) getUser() string {
-	if user, ok := p.config.Settings["baremetal_user"].(string); ok {
+	if user := strings.TrimSpace(p.config.BareMetal.User); user != "" {
 		return user
 	}
 	return "ubuntu"
 }
 
 func (p *BareMetalProvider) sshCommand(host, user, command string) *exec.Cmd {
-	return exec.Command("ssh", fmt.Sprintf("%s@%s", user, host), command)
+	args := []string{}
+	if p.config.BareMetal.Port > 0 {
+		args = append(args, "-p", fmt.Sprint(p.config.BareMetal.Port))
+	}
+	if keyPath := strings.TrimSpace(p.config.BareMetal.SSHKeyPath); keyPath != "" {
+		args = append(args, "-i", keyPath)
+	}
+	args = append(args, fmt.Sprintf("%s@%s", user, host), command)
+	return exec.Command("ssh", args...)
 }

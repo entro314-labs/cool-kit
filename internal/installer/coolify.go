@@ -121,7 +121,7 @@ func (d *CoolifyDeployer) downloadInstaller(ctx context.Context) error {
 	d.sendLog(fmt.Sprintf("Downloading installer from %s...", CoolifyInstallScriptURL))
 
 	// Create temporary directory
-	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("coolify-cli-%d", time.Now().Unix()))
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("cool-kit-%d", time.Now().Unix()))
 	if err := os.MkdirAll(tmpDir, 0750); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}

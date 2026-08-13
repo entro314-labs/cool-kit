@@ -64,10 +64,6 @@ func init() {
 }
 
 func getAppUUID() (string, *api.Client, error) {
-	if err := checkLogin(); err != nil {
-		return "", nil, err
-	}
-
 	projectCfg, err := config.LoadProject()
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to load project config: %w", err)
@@ -81,12 +77,11 @@ func getAppUUID() (string, *api.Client, error) {
 		return "", nil, fmt.Errorf("no application found. Deploy first with '%s'", execName())
 	}
 
-	globalCfg, err := config.LoadGlobal()
+	client, _, err := getCurrentCoolifyClient()
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to load config: %w", err)
+		return "", nil, err
 	}
 
-	client := api.NewClient(globalCfg.CoolifyURL, globalCfg.CoolifyToken)
 	return appUUID, client, nil
 }
 
@@ -262,7 +257,15 @@ func runEnvPull(cmd *cobra.Command, args []string) error {
 	}
 	ui.Success("Fetched environment variables")
 
-	if len(envVars) == 0 {
+	isPreview := !prodFlag
+	filtered := make([]api.EnvVar, 0, len(envVars))
+	for _, env := range envVars {
+		if env.IsPreview == isPreview {
+			filtered = append(filtered, env)
+		}
+	}
+
+	if len(filtered) == 0 {
 		ui.Warning("No environment variables to pull")
 		return nil
 	}
@@ -286,15 +289,15 @@ func runEnvPull(cmd *cobra.Command, args []string) error {
 	}
 	defer file.Close()
 
-	for _, env := range envVars {
+	for _, env := range filtered {
 		fmt.Fprintf(file, "%s=%s\n", env.Key, env.Value)
 	}
 
 	ui.Spacer()
-	ui.Success(fmt.Sprintf("Pulled %d variables to .env", len(envVars)))
+	ui.Success(fmt.Sprintf("Pulled %d %s variables to .env", len(filtered), deploymentType))
 	ui.Spacer()
 	ui.KeyValue("File", ".env")
-	ui.KeyValue("Variables", fmt.Sprintf("%d", len(envVars)))
+	ui.KeyValue("Variables", fmt.Sprintf("%d", len(filtered)))
 
 	return nil
 }

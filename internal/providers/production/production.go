@@ -111,10 +111,10 @@ func (p *ProductionProvider) checkRequirements(progressChan chan<- ui.StepProgre
 	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Checking Docker Compose"}
 
 	// Check Docker Compose
-	args = p.buildSSHArgs("docker compose version || docker-compose version")
+	args = p.buildSSHArgs("docker compose version")
 	cmd = exec.Command("ssh", args...)
 	if err := cmd.Run(); err != nil {
-		logChan <- ui.LogMsg{Level: ui.LogWarning, Message: "Docker Compose not found, will install"}
+		return fmt.Errorf("Docker Compose v2 not installed on production server")
 	}
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.8, Message: "Checking disk space"}
@@ -221,23 +221,37 @@ docker compose -f docker-compose.prod.yml up -d
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		// Try with docker-compose (v1) as fallback
-		deployCmd = `
-cd /data/coolify/source
-docker-compose -f docker-compose.prod.yml pull
-docker-compose -f docker-compose.prod.yml up -d
-`
-		args = p.buildSSHArgs(deployCmd)
-		cmd = exec.Command("ssh", args...)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to deploy Coolify: %w", err)
-		}
+		return fmt.Errorf("failed to deploy Coolify: %w", err)
 	}
 
-	progressChan <- ui.StepProgressMsg{Progress: 0.7, Message: "Waiting for services"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.7, Message: "Verifying running services"}
 
-	logChan <- ui.LogMsg{Level: ui.LogInfo, Message: "Waiting 60 seconds for services to initialize"}
-	time.Sleep(60 * time.Second)
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.7 + (float64(attempt) / 20.0 * 0.2)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Checking service status (attempt %d/20)", attempt),
+		}
+
+		checkCmd := "cd /data/coolify/source && docker compose -f docker-compose.prod.yml ps --status running --services"
+		args = p.buildSSHArgs(checkCmd)
+		cmd = exec.Command("ssh", args...)
+		output, err := cmd.Output()
+		if err == nil && strings.TrimSpace(string(output)) != "" {
+			lastErr = nil
+			break
+		}
+		if err != nil {
+			lastErr = err
+		} else {
+			lastErr = fmt.Errorf("no services reported as running yet")
+		}
+		time.Sleep(10 * time.Second)
+	}
+	if lastErr != nil {
+		return fmt.Errorf("services did not report as running after deployment: %w", lastErr)
+	}
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Coolify deployed"}
 	return nil
@@ -297,33 +311,36 @@ func (p *ProductionProvider) runHealthChecks(progressChan chan<- ui.StepProgress
 
 	domain := p.config.Production.Domain
 
-	// Check HTTP endpoint (try both http and https)
-	healthCheck := fmt.Sprintf("curl -sL -o /dev/null -w '%%{http_code}' --max-time 10 https://%s/api/health || curl -sL -o /dev/null -w '%%{http_code}' --max-time 10 http://%s:8000/api/health", domain, domain)
-	args = p.buildSSHArgs(healthCheck)
-	cmd = exec.Command("ssh", args...)
-	output, err = cmd.Output()
-	if err != nil {
-		logChan <- ui.LogMsg{Level: ui.LogWarning, Message: fmt.Sprintf("Health check command failed: %v", err)}
+	// Check HTTP endpoint with retries (try both https and http fallback).
+	var lastStatus string
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.6 + (float64(attempt) / 20.0 * 0.3)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Checking endpoint readiness (attempt %d/20)", attempt),
+		}
+
+		healthCheck := fmt.Sprintf("code=$(curl -sL -o /dev/null -w '%%{http_code}' --max-time 10 https://%s/api/health || true); if [ \"$code\" = \"000\" ] || [ -z \"$code\" ]; then code=$(curl -sL -o /dev/null -w '%%{http_code}' --max-time 10 http://%s:8000/api/health || true); fi; echo \"$code\"", domain, domain)
+		args = p.buildSSHArgs(healthCheck)
+		cmd = exec.Command("ssh", args...)
+		output, err = cmd.Output()
+		if err == nil {
+			lastStatus = strings.TrimSpace(string(output))
+			if lastStatus != "" && lastStatus != "000" && !strings.HasPrefix(lastStatus, "5") {
+				logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: fmt.Sprintf("Health check passed (HTTP %s)", lastStatus)}
+				progressChan <- ui.StepProgressMsg{Progress: 0.95, Message: "Health checks completed"}
+				return nil
+			}
+		}
+		time.Sleep(10 * time.Second)
 	}
 
-	statusCode := strings.TrimSpace(string(output))
-	if statusCode == "200" {
-		logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Health check passed (HTTP 200)"}
-	} else {
-		logChan <- ui.LogMsg{Level: ui.LogWarning, Message: fmt.Sprintf("Health check returned: %s (may need DNS propagation)", statusCode)}
-	}
-
-	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Health checks completed"}
-	return nil
+	return fmt.Errorf("health endpoint did not become ready for %s (last status: %s)", domain, lastStatus)
 }
 
 // Helper methods
 
 func (p *ProductionProvider) getHost() string {
-	// Use baremetal config for SSH host if production doesn't have one
-	if host, ok := p.config.Settings["production_host"].(string); ok && host != "" {
-		return host
-	}
 	if p.config.BareMetal.Host != "" {
 		return p.config.BareMetal.Host
 	}
@@ -332,9 +349,6 @@ func (p *ProductionProvider) getHost() string {
 }
 
 func (p *ProductionProvider) getUser() string {
-	if user, ok := p.config.Settings["production_user"].(string); ok && user != "" {
-		return user
-	}
 	if p.config.BareMetal.User != "" {
 		return p.config.BareMetal.User
 	}
@@ -342,9 +356,6 @@ func (p *ProductionProvider) getUser() string {
 }
 
 func (p *ProductionProvider) getSSHKeyPath() string {
-	if keyPath, ok := p.config.Settings["production_ssh_key"].(string); ok && keyPath != "" {
-		return keyPath
-	}
 	if p.config.BareMetal.SSHKeyPath != "" {
 		return p.config.BareMetal.SSHKeyPath
 	}

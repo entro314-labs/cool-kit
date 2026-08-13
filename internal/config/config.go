@@ -20,7 +20,7 @@ type Config struct {
 	CurrentContext      string     `json:"current_context" mapstructure:"current_context"`
 	LastUpdateCheckTime string     `json:"lastUpdateCheckTime" mapstructure:"lastUpdateCheckTime"`
 
-	// Legacy/Single-instance configuration (kept for backward compatibility)
+	// Deployment configuration
 	Provider    string           `json:"provider" mapstructure:"provider"`
 	Environment string           `json:"environment" mapstructure:"environment"`
 	Settings    map[string]any   `json:"settings" mapstructure:"settings"`
@@ -135,10 +135,10 @@ var (
 	configDir    string
 )
 
-// Default configuration values for CDP functionality
+// Default configuration values for cool-kit functionality
 const (
 	DefaultBranch   = "v4.x"
-	DefaultPlatform = "linux/amd64" // Docker platform for server compatibility
+	DefaultPlatform = "linux/amd64"
 )
 
 // Initialize initializes the configuration system
@@ -182,16 +182,7 @@ func Initialize() error {
 		if inst.Token == "" || inst.Token == "keyring" {
 			key := fmt.Sprintf("instance-%s-token", inst.Name)
 			token, err := getToken(key)
-			if err != nil {
-				// We don't want to crash if one token is missing, but if the keyring is broken we should know.
-				// For now, let's just log it effectively by returning the error if it's a serious keyring issue,
-				// or maybe just ignoring it if it's "item not found".
-				// Since we don't know the exact "not found" error type easily without importing the lib,
-				// and we want to stop "silent failures", let's strictly return the error.
-				// If the user expects it to work and it doesn't, they need to know.
-				return fmt.Errorf("failed to retrieve token for instance %s: %w", inst.Name, err)
-			}
-			if token != "" {
+			if err == nil && token != "" {
 				globalConfig.Instances[i].Token = token
 			}
 		}
@@ -225,7 +216,7 @@ func setDefaults() {
 	// AWS defaults
 	viper.SetDefault("aws.region", "us-east-1")
 	viper.SetDefault("aws.instance_type", "t3.medium")
-	viper.SetDefault("aws.ami", "ami-0c55b159cbfafe1f0")
+	viper.SetDefault("aws.ami", "ami-04b70fa74e45c3917")
 	viper.SetDefault("aws.ssh_key_path", "~/.ssh/id_rsa.pub")
 
 	// GCP defaults
@@ -264,7 +255,7 @@ func createDefaultConfig() error {
 		AWS: AWSConfig{
 			Region:       "us-east-1",
 			InstanceType: "t3.medium",
-			AMI:          "ami-0c55b159cbfafe1f0",
+			AMI:          "ami-04b70fa74e45c3917",
 			SSHKeyPath:   "~/.ssh/id_rsa.pub",
 		},
 		GCP: GCPConfig{
@@ -437,12 +428,9 @@ func (c *Config) Merge(overrides map[string]string) error {
 		case "domain":
 			c.Production.Domain = v
 		case "ssh_host":
-			// ProductionConfig doesn't seem to have SSHHost?
-			// Checking ProductionConfig struct: Domain, SSLEmail, Kubeconfig, Namespace.
-			// Maybe it maps to Settings?
-			c.Settings["ssh_host"] = v
+			c.BareMetal.Host = v
 		case "ssh_user":
-			c.Settings["ssh_user"] = v
+			c.BareMetal.User = v
 
 		// Generic/Other
 		default:
@@ -547,6 +535,60 @@ func AddInstance(name, fqdn, token string, setAsDefault bool) error {
 		Token:   token,
 		Default: len(cfg.Instances) == 0 || setAsDefault,
 	})
+
+	return Save(cfg)
+}
+
+// UpsertInstance creates or updates an instance in the configuration.
+// If setAsDefault is true, the upserted instance becomes the current default context.
+func UpsertInstance(name, fqdn, token string, setAsDefault bool) error {
+	cfg := Get()
+	if cfg == nil {
+		return fmt.Errorf("configuration not initialized")
+	}
+
+	updated := false
+	for i := range cfg.Instances {
+		if cfg.Instances[i].Name != name {
+			continue
+		}
+
+		cfg.Instances[i].FQDN = fqdn
+		cfg.Instances[i].Token = token
+		updated = true
+		break
+	}
+
+	if !updated {
+		cfg.Instances = append(cfg.Instances, Instance{
+			Name:  name,
+			FQDN:  fqdn,
+			Token: token,
+		})
+	}
+
+	// Ensure at least one default exists.
+	if len(cfg.Instances) == 1 || setAsDefault {
+		for i := range cfg.Instances {
+			cfg.Instances[i].Default = cfg.Instances[i].Name == name
+		}
+		cfg.CurrentContext = name
+	} else {
+		// Preserve existing default, but make the upserted instance default if none exists.
+		hasDefault := false
+		for _, inst := range cfg.Instances {
+			if inst.Default {
+				hasDefault = true
+				break
+			}
+		}
+		if !hasDefault {
+			for i := range cfg.Instances {
+				cfg.Instances[i].Default = cfg.Instances[i].Name == name
+			}
+			cfg.CurrentContext = name
+		}
+	}
 
 	return Save(cfg)
 }
@@ -680,4 +722,21 @@ func ListInstances() ([]Instance, error) {
 	}
 
 	return cfg.Instances, nil
+}
+
+// ClearInstances removes all configured instances and their stored keyring tokens.
+func ClearInstances() error {
+	cfg := Get()
+	if cfg == nil {
+		return fmt.Errorf("configuration not initialized")
+	}
+
+	for _, inst := range cfg.Instances {
+		_ = deleteToken(fmt.Sprintf("instance-%s-token", inst.Name))
+	}
+
+	cfg.Instances = []Instance{}
+	cfg.CurrentContext = ""
+
+	return Save(cfg)
 }

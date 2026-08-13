@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 )
 
-const projectConfigFile = ".coolify-deployer/config.json"
+const (
+	projectConfigFile = ".cool-kit/project.json"
+)
 
 // LoadProject loads the project configuration from the current directory
 func LoadProject() (*ProjectConfig, error) {
@@ -18,10 +20,10 @@ func LoadProject() (*ProjectConfig, error) {
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, os.ErrNotExist
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to read project config: %w", err)
 		}
-		return nil, fmt.Errorf("failed to read project config: %w", err)
+		return nil, os.ErrNotExist
 	}
 
 	cfg := &ProjectConfig{}
@@ -94,11 +96,8 @@ func HasProject() bool {
 		return false
 	}
 
-	_, err = os.Stat(configPath)
-	return err == nil
-}
-
-// ProjectExists is an alias for HasProject for backwards compatibility
-func ProjectExists() bool {
-	return HasProject()
+	if _, err = os.Stat(configPath); err == nil {
+		return true
+	}
+	return false
 }

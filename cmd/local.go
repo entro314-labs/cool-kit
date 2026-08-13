@@ -122,5 +122,4 @@ func init() {
 	localResetCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 
 	// Add local command to root
-	rootCmd.AddCommand(localCmd)
 }

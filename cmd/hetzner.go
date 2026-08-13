@@ -97,7 +97,6 @@ func init() {
 	hetznerCmd.AddCommand(hetznerDestroyCmd)
 
 	// Add hetzner command to root
-	rootCmd.AddCommand(hetznerCmd)
 }
 
 func runHetznerDeploy(useTUI bool) error {

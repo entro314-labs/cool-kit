@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/entro314-labs/cool-kit/internal/api"
-	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/output"
 	"github.com/entro314-labs/cool-kit/internal/service"
 	"github.com/spf13/cobra"
@@ -87,16 +85,11 @@ var teamMembersCmd = &cobra.Command{
 
 // getAPIClient creates an API client from current configuration
 func getAPIClient() (*api.Client, error) {
-	cfg, err := config.LoadGlobal()
+	client, _, err := getCurrentCoolifyClient()
 	if err != nil {
-		return nil, fmt.Errorf("not logged in: run 'cool-kit login' first")
+		return nil, err
 	}
-
-	if cfg.CoolifyURL == "" || cfg.CoolifyToken == "" {
-		return nil, fmt.Errorf("no Coolify instance configured. Run 'cool-kit login' first")
-	}
-
-	return api.NewClient(cfg.CoolifyURL, cfg.CoolifyToken), nil
+	return client, nil
 }
 
 // formatOutput formats and prints output

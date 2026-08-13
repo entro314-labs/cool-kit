@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/entro314-labs/cool-kit/internal/config"
@@ -96,9 +97,9 @@ func (p *DockerProvider) validateDocker(progressChan chan<- ui.StepProgressMsg, 
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.6, Message: "Checking Docker Compose"}
 
-	cmd = exec.Command("docker-compose", "version")
+	cmd = exec.Command("docker", "compose", "version")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Docker Compose not installed: %w", err)
+		return fmt.Errorf("Docker Compose v2 is required: %w", err)
 	}
 
 	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Docker validated"}
@@ -188,7 +189,7 @@ func (p *DockerProvider) pullImages(progressChan chan<- ui.StepProgressMsg, logC
 	workDir := p.config.Git.WorkDir
 	composeFile := p.getComposeFile()
 
-	cmd := exec.Command("docker-compose", "-f", composeFile, "pull")
+	cmd := p.composeCommand(composeFile, "pull")
 	cmd.Dir = workDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -208,7 +209,7 @@ func (p *DockerProvider) startServices(progressChan chan<- ui.StepProgressMsg, l
 	workDir := p.config.Git.WorkDir
 	composeFile := p.getComposeFile()
 
-	cmd := exec.Command("docker-compose", "-f", composeFile, "up", "-d")
+	cmd := p.composeCommand(composeFile, "up", "-d")
 	cmd.Dir = workDir
 
 	if err := cmd.Run(); err != nil {
@@ -225,11 +226,41 @@ func (p *DockerProvider) startServices(progressChan chan<- ui.StepProgressMsg, l
 func (p *DockerProvider) waitForServices(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
 	progressChan <- ui.StepProgressMsg{Progress: 0.2, Message: "Waiting for services"}
 
-	logChan <- ui.LogMsg{Level: ui.LogInfo, Message: "Waiting 30 seconds for services to initialize"}
-	time.Sleep(30 * time.Second)
+	workDir := p.config.Git.WorkDir
+	composeFile := p.getComposeFile()
+	var lastErr error
 
-	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Services ready"}
-	return nil
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.2 + (float64(attempt) / 20.0 * 0.7)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Checking running services (attempt %d/20)", attempt),
+		}
+
+		cmd := p.composeCommand(composeFile, "ps", "--status", "running", "--services")
+		cmd.Dir = workDir
+		output, err := cmd.Output()
+		if err == nil {
+			running := 0
+			for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+				if strings.TrimSpace(line) != "" {
+					running++
+				}
+			}
+			if running > 0 {
+				logChan <- ui.LogMsg{Level: ui.LogInfo, Message: fmt.Sprintf("Running services detected: %d", running)}
+				progressChan <- ui.StepProgressMsg{Progress: 0.95, Message: "Services ready"}
+				return nil
+			}
+			lastErr = fmt.Errorf("no running services reported yet")
+		} else {
+			lastErr = err
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+
+	return fmt.Errorf("services did not become ready: %w", lastErr)
 }
 
 // runHealthChecks runs health checks
@@ -282,4 +313,10 @@ func (p *DockerProvider) getComposeFile() string {
 	default:
 		return "docker-compose.local.yml"
 	}
+}
+
+func (p *DockerProvider) composeCommand(composeFile string, args ...string) *exec.Cmd {
+	cmdArgs := []string{"compose", "-f", composeFile}
+	cmdArgs = append(cmdArgs, args...)
+	return exec.Command("docker", cmdArgs...)
 }

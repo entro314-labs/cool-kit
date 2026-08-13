@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -132,7 +133,7 @@ func Load(path string) (*Config, error) {
 func LoadOrDefault(path string) (*Config, error) {
 	cfg, err := Load(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return DefaultConfig(), nil
 		}
 		return nil, err

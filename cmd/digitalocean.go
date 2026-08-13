@@ -95,7 +95,6 @@ func init() {
 	digitaloceanCmd.AddCommand(digitaloceanDestroyCmd)
 
 	// Add digitalocean command to root
-	rootCmd.AddCommand(digitaloceanCmd)
 }
 
 func runDigitalOceanDeploy(useTUI bool) error {

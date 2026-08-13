@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/entro314-labs/cool-kit/internal/api"
 	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/git"
 	"github.com/entro314-labs/cool-kit/internal/ui"
@@ -30,12 +29,12 @@ func runReset(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load project config: %w", err)
 	}
 	if projectCfg == nil {
-		return fmt.Errorf("no cdp.json found")
+		return fmt.Errorf("no project configuration found (.cool-kit/project.json)")
 	}
 
 	globalCfg, err := config.LoadGlobal()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		globalCfg = &config.GlobalConfig{}
 	}
 
 	// Show what will be deleted
@@ -70,12 +69,15 @@ func runReset(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("canceled")
 	}
 
-	client := api.NewClient(globalCfg.CoolifyURL, globalCfg.CoolifyToken)
+	coolifyClient, _, coolifyClientErr := getCurrentCoolifyClient()
+	if coolifyClientErr != nil {
+		ui.Warning(fmt.Sprintf("Skipping Coolify cleanup: %v", coolifyClientErr))
+	}
 
 	// Delete Coolify app
-	if projectCfg.AppUUID != "" {
+	if projectCfg.AppUUID != "" && coolifyClient != nil {
 		ui.Info("Deleting Coolify app...")
-		err := client.DeleteApplication(cmd.Context(), projectCfg.AppUUID)
+		err := coolifyClient.DeleteApplication(cmd.Context(), projectCfg.AppUUID)
 		if err != nil {
 			ui.Warning(fmt.Sprintf("Failed to delete app: %v", err))
 		} else {
@@ -85,7 +87,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 
 	// Delete Coolify project with retries
 	// (Coolify requires all resources to be deleted first)
-	if projectCfg.ProjectUUID != "" {
+	if projectCfg.ProjectUUID != "" && coolifyClient != nil {
 		ui.Info("Waiting for Coolify cleanup...")
 		time.Sleep(5 * time.Second)
 
@@ -94,7 +96,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 		// Try up to 5 times with increasing delays
 		var lastErr error
 		for attempt := 1; attempt <= 5; attempt++ {
-			err := client.DeleteProject(cmd.Context(), projectCfg.ProjectUUID)
+			err := coolifyClient.DeleteProject(cmd.Context(), projectCfg.ProjectUUID)
 			if err == nil {
 				ui.Success("Deleted Coolify project")
 				break
@@ -133,13 +135,13 @@ func runReset(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Delete local cdp.json
-	ui.Info("Removing cdp.json...")
+	// Delete local project config
+	ui.Info("Removing project configuration...")
 	err = config.DeleteProject()
 	if err != nil {
-		ui.Warning(fmt.Sprintf("Failed to delete cdp.json: %v", err))
+		ui.Warning(fmt.Sprintf("Failed to delete project configuration: %v", err))
 	} else {
-		ui.Success("Removed cdp.json")
+		ui.Success("Removed project configuration")
 	}
 
 	// Delete README.md if it exists
@@ -165,7 +167,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println()
-	ui.Success("Reset complete. Run 'cdp' to set up again.")
+	ui.Success(fmt.Sprintf("Reset complete. Run '%s' to set up again.", execName()))
 
 	return nil
 }

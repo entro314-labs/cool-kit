@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -36,25 +35,25 @@ var (
 func init() {
 	badgeCmd.Flags().StringVarP(&badgeFormat, "format", "f", "markdown", "Output format (markdown, html, url)")
 	badgeCmd.Flags().StringVar(&badgeService, "service", "", "Badge service URL (default: uses Coolify instance)")
-	rootCmd.AddCommand(badgeCmd)
 }
 
 func runBadge(cmd *cobra.Command, args []string) error {
 	appUUID := args[0]
-
-	// Get Coolify URL for badge service
-	globalCfg, err := config.LoadGlobal()
-	if err != nil {
-		return fmt.Errorf("not logged in, run 'cool-kit login' first")
-	}
 
 	// Determine badge URL
 	var badgeURL string
 	if badgeService != "" {
 		badgeURL = fmt.Sprintf("%s/badge/%s", strings.TrimSuffix(badgeService, "/"), appUUID)
 	} else {
+		if err := checkLogin(); err != nil {
+			return err
+		}
+		instance, err := getCurrentInstance()
+		if err != nil {
+			return err
+		}
 		// Default: assume badge service runs on same domain or use placeholder
-		baseURL := strings.TrimSuffix(globalCfg.CoolifyURL, "/")
+		baseURL := strings.TrimSuffix(instance.FQDN, "/")
 		baseURL = strings.TrimSuffix(baseURL, "/api/v1")
 		badgeURL = fmt.Sprintf("%s/badge/%s", baseURL, appUUID)
 	}

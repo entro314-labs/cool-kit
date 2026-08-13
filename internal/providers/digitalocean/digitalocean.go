@@ -2,6 +2,7 @@ package digitalocean
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -121,7 +122,10 @@ func (p *DigitalOceanProvider) createDroplet(progressChan chan<- ui.StepProgress
 	progressChan <- ui.StepProgressMsg{Progress: 0.2, Message: "Creating droplet"}
 
 	dropletName := fmt.Sprintf("coolify-%d", time.Now().Unix())
-	sshFingerprint := p.config.Settings["do_ssh_fingerprint"].(string)
+	sshFingerprint, ok := p.config.Settings["do_ssh_fingerprint"].(string)
+	if !ok || sshFingerprint == "" {
+		return fmt.Errorf("SSH key fingerprint not found - setup SSH key step did not complete")
+	}
 
 	info, err := p.client.CreateDroplet(DropletCreateOpts{
 		Name:            dropletName,
@@ -143,12 +147,19 @@ func (p *DigitalOceanProvider) createDroplet(progressChan chan<- ui.StepProgress
 }
 
 func (p *DigitalOceanProvider) waitForDroplet(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
-	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Waiting for droplet to be ready"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Waiting for droplet SSH access"}
 
-	// Droplet is already active from CreateDroplet
-	// Wait for SSH to be available
-	time.Sleep(30 * time.Second)
+	ip, ok := p.config.Settings["do_droplet_ip"].(string)
+	if !ok || ip == "" {
+		return fmt.Errorf("droplet IP not available")
+	}
 
+	sshClient := NewSSHClient(ip, "root")
+	if err := sshClient.WaitForSSH(3 * time.Minute); err != nil {
+		return fmt.Errorf("droplet became active but SSH is unavailable: %w", err)
+	}
+
+	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Droplet SSH is ready"}
 	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Droplet is ready"}
 	return nil
 }
@@ -162,12 +173,31 @@ func (p *DigitalOceanProvider) configureFirewall(progressChan chan<- ui.StepProg
 }
 
 func (p *DigitalOceanProvider) installDocker(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
-	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Docker installing via cloud-init"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Verifying Docker installation via cloud-init"}
 
-	time.Sleep(60 * time.Second)
+	ip, ok := p.config.Settings["do_droplet_ip"].(string)
+	if !ok || ip == "" {
+		return fmt.Errorf("droplet IP not available")
+	}
 
-	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Docker installed"}
-	return nil
+	sshClient := NewSSHClient(ip, "root")
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.3 + (float64(attempt) / 20.0 * 0.6)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Waiting for Docker (attempt %d/20)", attempt),
+		}
+		if _, err := sshClient.Execute("docker --version"); err == nil {
+			logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Docker installed"}
+			return nil
+		} else {
+			lastErr = err
+		}
+		time.Sleep(10 * time.Second)
+	}
+
+	return fmt.Errorf("Docker did not become available on droplet: %w", lastErr)
 }
 
 func (p *DigitalOceanProvider) cloneRepository(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
@@ -178,21 +208,68 @@ func (p *DigitalOceanProvider) cloneRepository(progressChan chan<- ui.StepProgre
 }
 
 func (p *DigitalOceanProvider) deployCoolify(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
-	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Starting Coolify"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Verifying Coolify startup"}
 
-	time.Sleep(60 * time.Second)
+	ip, ok := p.config.Settings["do_droplet_ip"].(string)
+	if !ok || ip == "" {
+		return fmt.Errorf("droplet IP not available")
+	}
 
-	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Coolify deployed"}
-	return nil
+	sshClient := NewSSHClient(ip, "root")
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.5 + (float64(attempt) / 20.0 * 0.4)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Waiting for Coolify containers (attempt %d/20)", attempt),
+		}
+		if _, err := sshClient.Execute("docker ps --format '{{.Names}}' | grep -q coolify"); err == nil {
+			logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Coolify deployed"}
+			return nil
+		} else {
+			lastErr = err
+		}
+		time.Sleep(10 * time.Second)
+	}
+
+	return fmt.Errorf("Coolify containers did not become ready: %w", lastErr)
 }
 
 func (p *DigitalOceanProvider) runHealthChecks(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
-	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Checking health"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.2, Message: "Checking health"}
 
-	ip := p.config.Settings["do_droplet_ip"].(string)
-	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: fmt.Sprintf("Coolify available at: http://%s:8000", ip)}
+	ip, ok := p.config.Settings["do_droplet_ip"].(string)
+	if !ok || ip == "" {
+		return fmt.Errorf("droplet IP not available for health check")
+	}
+	url := fmt.Sprintf("http://%s:8000", ip)
+	httpClient := &http.Client{Timeout: 10 * time.Second}
 
-	return nil
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.2 + (float64(attempt) / 20.0 * 0.7)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Waiting for Coolify endpoint (attempt %d/20)", attempt),
+		}
+
+		resp, err := httpClient.Get(url)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+				logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: fmt.Sprintf("Coolify available at: %s", url)}
+				return nil
+			}
+			lastErr = fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
+		} else {
+			lastErr = err
+		}
+
+		time.Sleep(15 * time.Second)
+	}
+
+	return fmt.Errorf("Coolify endpoint did not become reachable at %s: %w", url, lastErr)
+
 }
 
 // Helper methods

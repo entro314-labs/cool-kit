@@ -156,7 +156,7 @@ func (d *AzureDeployer) createResourceGroup() error {
 	_, err = d.runAzCommand("group", "create",
 		"--name", rgName,
 		"--location", location,
-		"--tags", "createdby=coolify-cli", "environment=production")
+		"--tags", "createdby=cool-kit", "environment=production")
 
 	return err
 }

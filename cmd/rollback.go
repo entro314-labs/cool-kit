@@ -50,12 +50,10 @@ func runRollback(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no application found")
 	}
 
-	globalCfg, err := config.LoadGlobal()
+	client, _, err := getCurrentCoolifyClient()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return err
 	}
-
-	client := api.NewClient(globalCfg.CoolifyURL, globalCfg.CoolifyToken)
 
 	ui.Section("Rollback")
 

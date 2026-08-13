@@ -3,9 +3,11 @@ package local
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/ui"
 )
 
@@ -60,6 +62,7 @@ func Setup() error {
 	if err := cfg.Save(configPath); err != nil {
 		return fmt.Errorf("failed to save configuration: %w", err)
 	}
+	persistRuntimeLocalConfig(cfg)
 
 	// Step 8: Start services
 	ui.Info("Starting services (this may take a few minutes)...")
@@ -231,10 +234,13 @@ func displaySetupSummary(cfg *Config) {
 func Start() error {
 	ui.Section("Starting Local Coolify")
 
-	// Load configuration
-	cfg, err := LoadOrDefault("./coolify-local/.coolify-config.json")
+	workDir := configuredWorkDir()
+	cfg, err := Load(filepath.Join(workDir, ".coolify-config.json"))
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w (run 'cool-kit local setup' first)", err)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("failed to load configuration from %s: run 'cool-kit local setup' first", workDir)
+		}
+		return fmt.Errorf("failed to load configuration from %s: %w", workDir, err)
 	}
 
 	ui.Info("Starting services...")
@@ -252,8 +258,7 @@ func Start() error {
 func Stop() error {
 	ui.Section("Stopping Local Coolify")
 
-	// Try to find work directory
-	workDir := "./coolify-local"
+	workDir := configuredWorkDir()
 
 	ui.Info("Stopping services...")
 	if err := ComposeDown(workDir, false); err != nil {
@@ -270,8 +275,7 @@ func Stop() error {
 func Logs(service string, follow bool, tail int) error {
 	ui.Section("Viewing Logs")
 
-	// Try to find work directory
-	workDir := "./coolify-local"
+	workDir := configuredWorkDir()
 
 	if service != "" {
 		ui.Info(fmt.Sprintf("Service: %s", service))
@@ -298,8 +302,7 @@ func Reset(force bool) error {
 		}
 	}
 
-	// Try to find work directory
-	workDir := "./coolify-local"
+	workDir := configuredWorkDir()
 
 	ui.Info("Stopping services...")
 	if err := ComposeDown(workDir, true); err != nil {
@@ -316,8 +319,7 @@ func Reset(force bool) error {
 func Update() error {
 	ui.Section("Updating Local Coolify")
 
-	// Try to find work directory
-	workDir := "./coolify-local"
+	workDir := configuredWorkDir()
 
 	ui.Info("Pulling latest images...")
 	if err := ComposePull(workDir); err != nil {
@@ -351,4 +353,25 @@ func Update() error {
 	ui.Dim("Services have been updated to the latest version")
 
 	return nil
+}
+
+func configuredWorkDir() string {
+	cfg := config.Get()
+	if cfg != nil && cfg.Local.WorkDir != "" {
+		return cfg.Local.WorkDir
+	}
+	return "./coolify-local"
+}
+
+func persistRuntimeLocalConfig(localCfg *Config) {
+	cfg := config.Get()
+	if cfg == nil {
+		return
+	}
+
+	cfg.Local.WorkDir = localCfg.WorkDir
+	cfg.Local.AppPort = localCfg.AppPort
+	cfg.Local.WebSocketPort = localCfg.WebSocketPort
+	cfg.Local.Debug = localCfg.AppDebug
+	_ = config.Save(cfg)
 }

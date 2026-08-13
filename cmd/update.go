@@ -40,7 +40,6 @@ func init() {
 	updateCmd.Flags().BoolVar(&updateDryRun, "dry-run", false, "Show what would be done without executing")
 	updateCmd.Flags().BoolVarP(&updateForce, "force", "f", false, "Skip confirmation prompt")
 
-	rootCmd.AddCommand(updateCmd)
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
@@ -54,7 +53,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	if host == "" {
 		// Try to get from last deployment
 		cfg := config.Get()
-		if cfg.Settings != nil {
+		if cfg != nil && cfg.Settings != nil {
 			if h, ok := cfg.Settings["public_ip"].(string); ok && h != "" {
 				host = h
 				ui.Info(fmt.Sprintf("Using host from last deployment: %s", host))
@@ -69,7 +68,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// Get user from config if not specified
 	if user == "root" {
 		cfg := config.Get()
-		if cfg.Azure.AdminUsername != "" {
+		if cfg != nil && cfg.Azure.AdminUsername != "" {
 			user = cfg.Azure.AdminUsername
 		}
 	}

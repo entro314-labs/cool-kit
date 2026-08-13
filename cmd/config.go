@@ -1,15 +1,13 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
+	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/ui"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var configCmd = &cobra.Command{
@@ -32,10 +30,10 @@ var configShowCmd = &cobra.Command{
 			}
 
 			// Get current value
-			currentVal := viper.Get(key)
-			currentStr := fmt.Sprintf("%v", currentVal)
-			if currentVal == nil {
-				currentStr = ""
+			currentStr, err := getConfigValue(key)
+			if err != nil {
+				ui.Error(fmt.Sprintf("Failed to load %s: %v", key, err))
+				continue
 			}
 
 			// Ask for new value
@@ -91,15 +89,10 @@ var configResetCmd = &cobra.Command{
 			return nil
 		}
 
-		// Get config path and remove it
-		configPath := viper.ConfigFileUsed()
-		if configPath == "" {
-			ui.Warning("No configuration file found")
-			return nil
-		}
-
-		if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove config file: %w", err)
+		// Reset in-memory config to defaults and persist.
+		defaultCfg := config.New()
+		if err := config.Save(defaultCfg); err != nil {
+			return fmt.Errorf("failed to reset configuration: %w", err)
 		}
 
 		ui.Success("Configuration reset to defaults")
@@ -118,22 +111,18 @@ Examples:
   cool-kit config export my-backup.json`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get all settings
-		allSettings := viper.AllSettings()
-
-		// Pretty print JSON
-		data, err := json.MarshalIndent(allSettings, "", "  ")
+		data, err := config.ExportConfig()
 		if err != nil {
-			return fmt.Errorf("failed to marshal config: %w", err)
+			return fmt.Errorf("failed to export configuration: %w", err)
 		}
 
 		if len(args) == 0 {
 			// Output to stdout
-			fmt.Println(string(data))
+			fmt.Println(data)
 		} else {
 			// Write to file
 			filePath := args[0]
-			if err := os.WriteFile(filePath, data, 0644); err != nil {
+			if err := os.WriteFile(filePath, []byte(data), 0644); err != nil {
 				return fmt.Errorf("failed to write config to %s: %w", filePath, err)
 			}
 			ui.Success(fmt.Sprintf("Configuration exported to %s", filePath))
@@ -161,14 +150,8 @@ Examples:
 			return fmt.Errorf("failed to read %s: %w", filePath, err)
 		}
 
-		// Parse JSON
-		var imported map[string]any
-		if err := json.Unmarshal(data, &imported); err != nil {
-			return fmt.Errorf("failed to parse JSON: %w", err)
-		}
-
 		// Confirm import
-		confirm, err := ui.Confirm(fmt.Sprintf("Import %d settings from %s?", len(imported), filePath))
+		confirm, err := ui.Confirm(fmt.Sprintf("Import configuration from %s?", filePath))
 		if err != nil {
 			return err
 		}
@@ -176,14 +159,8 @@ Examples:
 			return nil
 		}
 
-		// Merge into viper
-		for key, value := range imported {
-			viper.Set(key, value)
-		}
-
-		// Save
-		if err := saveConfig(); err != nil {
-			return fmt.Errorf("failed to save config: %w", err)
+		if err := config.ImportConfig(string(data)); err != nil {
+			return fmt.Errorf("failed to import configuration: %w", err)
 		}
 
 		ui.Success(fmt.Sprintf("Imported configuration from %s", filePath))
@@ -193,43 +170,61 @@ Examples:
 
 // setConfigValue sets a config value with proper type conversion
 func setConfigValue(key, value string) error {
-	// Try to parse as int
-	if i, err := strconv.Atoi(value); err == nil {
-		viper.Set(key, i)
-	} else if b, err := strconv.ParseBool(value); err == nil {
-		// Try to parse as bool
-		viper.Set(key, b)
-	} else {
-		// Keep as string
-		viper.Set(key, value)
+	cfg := config.Get()
+	if cfg == nil {
+		return fmt.Errorf("configuration not initialized")
 	}
 
-	return saveConfig()
+	switch key {
+	case "provider":
+		cfg.Provider = value
+	case "environment":
+		cfg.Environment = value
+	case "local.app_port":
+		i, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("invalid integer for %s: %q", key, value)
+		}
+		cfg.Local.AppPort = i
+	case "local.websocket_port":
+		i, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("invalid integer for %s: %q", key, value)
+		}
+		cfg.Local.WebSocketPort = i
+	case "azure.location":
+		cfg.Azure.Location = value
+	case "azure.vm_size":
+		cfg.Azure.VMSize = value
+	default:
+		return fmt.Errorf("unsupported config key: %s", key)
+	}
+
+	return config.Save(cfg)
 }
 
-// saveConfig writes viper config to file
-func saveConfig() error {
-	configPath := viper.ConfigFileUsed()
-	if configPath == "" {
-		// Create default config path
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		configDir := home + "/.coolify-cli"
-		if err := os.MkdirAll(configDir, 0755); err != nil {
-			return err
-		}
-		configPath = configDir + "/config.yaml"
+func getConfigValue(key string) (string, error) {
+	cfg := config.Get()
+	if cfg == nil {
+		return "", fmt.Errorf("configuration not initialized")
 	}
 
-	// Ensure directory exists
-	dir := configPath[:strings.LastIndex(configPath, "/")]
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+	switch key {
+	case "provider":
+		return cfg.Provider, nil
+	case "environment":
+		return cfg.Environment, nil
+	case "local.app_port":
+		return strconv.Itoa(cfg.Local.AppPort), nil
+	case "local.websocket_port":
+		return strconv.Itoa(cfg.Local.WebSocketPort), nil
+	case "azure.location":
+		return cfg.Azure.Location, nil
+	case "azure.vm_size":
+		return cfg.Azure.VMSize, nil
+	default:
+		return "", fmt.Errorf("unsupported config key: %s", key)
 	}
-
-	return viper.WriteConfigAs(configPath)
 }
 
 func init() {
@@ -239,5 +234,4 @@ func init() {
 	configCmd.AddCommand(configExportCmd)
 	configCmd.AddCommand(configImportCmd)
 
-	rootCmd.AddCommand(configCmd)
 }

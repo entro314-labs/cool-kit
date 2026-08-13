@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/log"
 )
 
-var debugMode = os.Getenv("CDP_DEBUG") != ""
+var debugMode = os.Getenv("COOLKIT_DEBUG") != "" || os.Getenv("CDP_DEBUG") != ""
 
 func trace(fn string) {
 	if debugMode {

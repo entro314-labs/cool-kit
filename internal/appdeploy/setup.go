@@ -264,7 +264,7 @@ func chooseDeployMethod(globalCfg *config.GlobalConfig) (string, error) {
 		})
 		ui.Spacer()
 		ui.NextSteps([]string{
-			"Run 'cdp login' to configure authentication",
+			"Run 'cool-kit login' to configure authentication",
 		})
 		return "", fmt.Errorf("no deployment method configured")
 	}

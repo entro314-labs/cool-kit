@@ -1,9 +1,7 @@
 package config
 
-// GlobalConfig represents user-level configuration for CDP functionality
+// GlobalConfig represents optional user-level integrations.
 type GlobalConfig struct {
-	CoolifyURL     string          `json:"coolify_url"`
-	CoolifyToken   string          `json:"coolify_token"`
 	GitHubToken    string          `json:"github_token,omitempty"`
 	DockerRegistry *DockerRegistry `json:"docker_registry,omitempty"`
 }

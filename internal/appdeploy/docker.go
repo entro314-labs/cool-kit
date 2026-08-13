@@ -58,7 +58,7 @@ func DeployDocker(ctx context.Context, client *api.Client, globalCfg *config.Glo
 		ui.Error("Deployment failed")
 		ui.Spacer()
 		ui.NextSteps([]string{
-			"Run 'cdp logs' to view deployment logs",
+			"Run 'cool-kit logs' to view deployment logs",
 			"Check the Coolify dashboard for more details",
 		})
 		return fmt.Errorf("deployment failed")
@@ -175,7 +175,7 @@ func createProjectTask(ctx context.Context, client *api.Client, projectCfg *conf
 		ActiveName:   "Creating Coolify project...",
 		CompleteName: "✓ Created Coolify project",
 		Action: func() error {
-			newProject, err := client.CreateProject(ctx, projectCfg.Name, "Created by CDP")
+			newProject, err := client.CreateProject(ctx, projectCfg.Name, "Created by cool-kit")
 			if err != nil {
 				return fmt.Errorf("failed to create Coolify project %q: %w", projectCfg.Name, err)
 			}

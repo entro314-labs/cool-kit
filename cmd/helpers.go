@@ -6,15 +6,17 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/entro314-labs/cool-kit/internal/api"
 	"github.com/entro314-labs/cool-kit/internal/config"
 )
 
 // checkLogin ensures the user is authenticated
 func checkLogin() error {
-	if !config.IsLoggedIn() {
-		return fmt.Errorf("not logged in: run '%s login' first", execName())
+	if inst, err := getCurrentInstance(); err == nil && inst != nil && inst.FQDN != "" && inst.Token != "" {
+		return nil
 	}
-	return nil
+
+	return fmt.Errorf("not logged in: run '%s login' first", execName())
 }
 
 // IsVerbose checks if verbose mode is enabled
@@ -38,7 +40,7 @@ func SetVerbose(v bool) {
 func execName() string {
 	name := filepath.Base(os.Args[0])
 	if name == "" {
-		return "coolify-deployer"
+		return "cool-kit"
 	}
 	return name
 }
@@ -69,4 +71,21 @@ func getCurrentInstance() (*config.Instance, error) {
 
 	// Use context-based instance
 	return config.GetCurrentInstance()
+}
+
+// getCurrentCoolifyClient returns an API client bound to the currently selected instance.
+func getCurrentCoolifyClient() (*api.Client, *config.Instance, error) {
+	if err := checkLogin(); err != nil {
+		return nil, nil, err
+	}
+
+	inst, err := getCurrentInstance()
+	if err != nil {
+		return nil, nil, err
+	}
+	if inst.FQDN == "" || inst.Token == "" {
+		return nil, nil, fmt.Errorf("current instance is missing URL or token")
+	}
+
+	return api.NewClient(inst.FQDN, inst.Token), inst, nil
 }

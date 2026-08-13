@@ -9,6 +9,11 @@ import (
 
 var globalCfg *GlobalConfig
 
+const (
+	globalConfigDirName  = ".cool-kit"
+	globalConfigFileName = "global.json"
+)
+
 // LoadGlobal loads the global configuration from disk
 func LoadGlobal() (*GlobalConfig, error) {
 	if globalCfg != nil {
@@ -23,7 +28,8 @@ func LoadGlobal() (*GlobalConfig, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("not logged in: run 'coolify-deployer login' first")
+			globalCfg = &GlobalConfig{}
+			return globalCfg, nil
 		}
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
@@ -31,13 +37,6 @@ func LoadGlobal() (*GlobalConfig, error) {
 	cfg := &GlobalConfig{}
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
-	}
-
-	// Load token from keyring if present
-	if cfg.CoolifyToken == "" || cfg.CoolifyToken == "keyring" {
-		if token, err := getToken("global-coolify-token"); err == nil && token != "" {
-			cfg.CoolifyToken = token
-		}
 	}
 
 	globalCfg = cfg
@@ -57,21 +56,8 @@ func SaveGlobal(cfg *GlobalConfig) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Save token to keyring
-	if cfg.CoolifyToken != "" {
-		if err := setToken("global-coolify-token", cfg.CoolifyToken); err != nil {
-			return fmt.Errorf("failed to store global token in keyring: %w", err)
-		}
-	}
-
-	// Prepare config for marshaling (avoid modifying original cfg)
-	marshalCfg := *cfg
-	if marshalCfg.CoolifyToken != "" {
-		marshalCfg.CoolifyToken = "keyring"
-	}
-
 	// Marshal config
-	data, err := json.MarshalIndent(marshalCfg, "", "  ")
+	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
@@ -92,16 +78,7 @@ func getGlobalConfigPath() (string, error) {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	return filepath.Join(home, ".coolify-deployer", "config.json"), nil
-}
-
-// IsLoggedIn checks if the user has valid credentials
-func IsLoggedIn() bool {
-	cfg, err := LoadGlobal()
-	if err != nil {
-		return false
-	}
-	return cfg.CoolifyURL != "" && cfg.CoolifyToken != ""
+	return filepath.Join(home, globalConfigDirName, globalConfigFileName), nil
 }
 
 // ClearGlobal removes the global configuration
@@ -114,6 +91,7 @@ func ClearGlobal() error {
 	if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove config: %w", err)
 	}
+	_ = deleteToken("global-coolify-token")
 
 	globalCfg = nil
 	return nil

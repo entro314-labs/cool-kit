@@ -77,7 +77,7 @@ func (h *HealthChecker) CheckWebSocket(ctx context.Context, url string, timeout 
 func (h *HealthChecker) CheckDockerService(composeFile string, minServices int) error {
 	h.logger.Debug("Checking Docker services in: %s", composeFile)
 
-	cmd := exec.Command("docker-compose", "-f", composeFile, "ps", "-q")
+	cmd := exec.Command("docker", "compose", "-f", composeFile, "ps", "-q")
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to check Docker services: %w", err)

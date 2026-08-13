@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/entro314-labs/cool-kit/internal/api"
 	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/ui"
 	"github.com/spf13/cobra"
@@ -33,12 +32,10 @@ func runLs(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("not linked to a project")
 	}
 
-	globalCfg, err := config.LoadGlobal()
+	client, _, err := getCurrentCoolifyClient()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return err
 	}
-
-	client := api.NewClient(globalCfg.CoolifyURL, globalCfg.CoolifyToken)
 
 	ui.Section(fmt.Sprintf("Project: %s", projectCfg.Name))
 

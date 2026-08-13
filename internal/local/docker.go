@@ -34,14 +34,9 @@ func CheckPrerequisites() error {
 
 // checkDockerCompose verifies Docker Compose is available
 func checkDockerCompose() error {
-	// Try 'docker compose' (new syntax)
 	cmd := exec.Command("docker", "compose", "version")
 	if err := cmd.Run(); err != nil {
-		// Try 'docker-compose' (old syntax)
-		cmd = exec.Command("docker-compose", "version")
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("docker compose is not installed. Please install Docker Compose")
-		}
+		return fmt.Errorf("docker compose plugin is not installed. Please install Docker Compose v2")
 	}
 	return nil
 }

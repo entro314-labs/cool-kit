@@ -40,7 +40,6 @@ func init() {
 	ciGithubCmd.Flags().StringVar(&ciBranch, "branch", "main", "Branch to trigger deployment on")
 
 	ciCmd.AddCommand(ciGithubCmd)
-	rootCmd.AddCommand(ciCmd)
 }
 
 func runCIGithub(cmd *cobra.Command, args []string) error {

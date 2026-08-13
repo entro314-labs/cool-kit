@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -23,15 +24,36 @@ Pillar 2: Deploy Apps TO Coolify
 Pillar 3: Enhance Coolify
   Optimize and enhance existing Coolify installations with best practices
 
-Features:
-  • Smart framework detection (Next.js, Laravel, Node.js, and 30+ more)
-  • Automatic service provisioning (PostgreSQL, MySQL, MongoDB, Redis, etc.)
-  • Multi-instance management (switch between Coolify instances)
-  • Production and preview deployments
-  • Environment variable management
-  • Deployment monitoring and rollbacks`,
-	RunE:         runMainTUI,
-	SilenceUsage: true,
+	Features:
+	  • Smart framework detection (Next.js, Laravel, Node.js, and 30+ more)
+	  • Automatic service provisioning (PostgreSQL, MySQL, MongoDB, Redis, etc.)
+	  • Multi-instance management (switch between Coolify instances)
+	  • Production and preview deployments
+	  • Environment variable management
+	  • Deployment monitoring and rollbacks`,
+	PersistentPreRunE: initRuntimeContext,
+	RunE:              runMainTUI,
+	SilenceUsage:      true,
+}
+
+func initRuntimeContext(cmd *cobra.Command, _ []string) error {
+	verbose, err := cmd.Flags().GetBool("verbose")
+	if err != nil {
+		return fmt.Errorf("failed to read verbose flag: %w", err)
+	}
+	SetVerbose(verbose)
+
+	instanceName, err := cmd.Flags().GetString("instance")
+	if err != nil {
+		return fmt.Errorf("failed to read instance flag: %w", err)
+	}
+	SetInstanceOverride(instanceName)
+
+	if err := config.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize configuration: %w", err)
+	}
+
+	return nil
 }
 
 // runMainTUI runs the main TUI menu and dispatches to subcommands
@@ -130,4 +152,6 @@ func init() {
 	rootCmd.AddCommand(badgeCmd)
 	rootCmd.AddCommand(backupCmd)
 	rootCmd.AddCommand(ciCmd)
+	rootCmd.AddCommand(updateCmd)
+	rootCmd.AddCommand(destroyCmd)
 }

@@ -77,9 +77,6 @@ func init() {
 
 	// Add flags for deploy command
 	awsDeployCmd.Flags().Bool("tui", true, "Use interactive TUI for deployment progress")
-
-	// Add aws command to root
-	rootCmd.AddCommand(awsCmd)
 }
 
 func runAWSDeploy(useTUI bool) error {

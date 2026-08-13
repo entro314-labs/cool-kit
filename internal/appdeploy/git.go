@@ -53,7 +53,7 @@ func DeployGit(ctx context.Context, client *api.Client, globalCfg *config.Global
 		ui.Error("Deployment failed")
 		ui.Spacer()
 		ui.NextSteps([]string{
-			"Run 'cdp logs' to view deployment logs",
+			"Run 'cool-kit logs' to view deployment logs",
 			"Check the Coolify dashboard for more details",
 		})
 		return fmt.Errorf("deployment failed")

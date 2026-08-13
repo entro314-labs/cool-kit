@@ -79,7 +79,6 @@ func init() {
 	gcpDeployCmd.Flags().Bool("tui", true, "Use interactive TUI for deployment progress")
 
 	// Add gcp command to root
-	rootCmd.AddCommand(gcpCmd)
 }
 
 func runGCPDeploy(useTUI bool) error {

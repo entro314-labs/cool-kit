@@ -267,6 +267,6 @@ func AutoCommitVerbose(dir string, verbose bool) error {
 		return fmt.Errorf("failed to stage changes: %w", err)
 	}
 
-	message := "Deploy via cdp"
+	message := "Deploy via cool-kit"
 	return CommitVerbose(dir, message, verbose)
 }

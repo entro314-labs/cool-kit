@@ -33,10 +33,9 @@ Optional:
 }
 
 func runLogin(cmd *cobra.Command, args []string) error {
-	// Load existing config if any
 	cfg, err := config.LoadGlobal()
 	if err != nil {
-		cfg = &config.GlobalConfig{}
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	ui.Section("Coolify Authentication")
@@ -81,15 +80,14 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	}
 	ui.Success("Connected to Coolify")
 
-	// Save instance (will be set as default if it's the first one)
+	// Save or update instance (set default only for first login)
 	isFirstInstance := !config.HasInstances()
-	if err := config.AddInstance(instanceName, coolifyURL, token, isFirstInstance); err != nil {
-		return fmt.Errorf("failed to save instance: %w", err)
+	if err := config.UpsertInstance(instanceName, coolifyURL, token, isFirstInstance); err != nil {
+		return fmt.Errorf("failed to save instance credentials: %w", err)
 	}
-
-	// Also save to global config for backwards compatibility
-	cfg.CoolifyURL = coolifyURL
-	cfg.CoolifyToken = token
+	if err := config.UseInstance(instanceName); err != nil {
+		return fmt.Errorf("failed to switch to instance %q: %w", instanceName, err)
+	}
 
 	// Step 2: Optional GitHub setup
 	ui.Section("GitHub Integration (Optional)")
@@ -140,7 +138,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	if setupDocker {
 		if !docker.IsDockerAvailable() {
 			ui.Warning("Docker is not running")
-			ui.Dim("Start Docker Desktop and run 'cdp login' again to configure registry")
+			ui.Dim(fmt.Sprintf("Start Docker Desktop and run '%s login' again to configure registry", execName()))
 		} else {
 			ui.Spacer()
 			registryURL, err := ui.InputWithDefault("Registry URL", "ghcr.io")

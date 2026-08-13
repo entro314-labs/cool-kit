@@ -80,7 +80,6 @@ func init() {
 	baremetalCmd.AddCommand(baremetalSSHCmd)
 
 	// Add baremetal command to root
-	rootCmd.AddCommand(baremetalCmd)
 }
 
 func runBareMetalDeploy(host, user string, useTUI bool) error {

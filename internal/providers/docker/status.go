@@ -52,16 +52,9 @@ func checkDockerDaemon() error {
 
 // checkDockerCompose verifies Docker Compose is available
 func checkDockerCompose() error {
-	// Try new docker compose
 	cmd := exec.Command("docker", "compose", "version")
-	if err := cmd.Run(); err == nil {
-		return nil
-	}
-
-	// Try legacy docker-compose
-	cmd = exec.Command("docker-compose", "version")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Docker Compose not found")
+		return fmt.Errorf("Docker Compose v2 not found")
 	}
 	return nil
 }

@@ -26,14 +26,21 @@ func runLogout(cmd *cobra.Command, args []string) error {
 	}
 
 	ui.Spacer()
-	if err := config.ClearGlobal(); err != nil {
-		// Ignore error if file doesn't exist
+	globalErr := config.ClearGlobal()
+	instanceErr := config.ClearInstances()
+	if globalErr != nil && instanceErr != nil {
 		ui.Warning("No credentials found")
 		return nil
+	}
+	if globalErr != nil {
+		ui.Warning("Failed to clear global credentials")
+	}
+	if instanceErr != nil {
+		ui.Warning("Failed to clear instance credentials")
 	}
 
 	ui.Success("Logged out successfully")
 	ui.Spacer()
-	ui.Dim("Run 'cdp login' to authenticate again")
+	ui.Dim("Run 'cool-kit login' to authenticate again")
 	return nil
 }

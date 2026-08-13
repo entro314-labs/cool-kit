@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/entro314-labs/cool-kit/internal/api"
 	"github.com/entro314-labs/cool-kit/internal/appdeploy"
 	"github.com/entro314-labs/cool-kit/internal/config"
 	"github.com/entro314-labs/cool-kit/internal/smart"
@@ -41,21 +40,20 @@ func init() {
 }
 
 func runDeploy(ctx context.Context) error {
-	if err := checkLogin(); err != nil {
+	client, _, err := getCurrentCoolifyClient()
+	if err != nil {
 		return err
 	}
 
 	globalCfg, err := config.LoadGlobal()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to load global integrations: %w", err)
 	}
 
 	projectCfg, err := config.LoadProject()
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to load project configuration: %w", err)
 	}
-
-	client := api.NewClient(globalCfg.CoolifyURL, globalCfg.CoolifyToken)
 
 	isFirstDeploy := false
 	var deploymentConfig *smart.DeploymentConfig

@@ -2,6 +2,7 @@ package hetzner
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -21,8 +22,10 @@ type HetznerProvider struct {
 func NewHetznerProvider(cfg *config.Config) (*HetznerProvider, error) {
 	// Get token from env or config
 	token := os.Getenv("HCLOUD_TOKEN")
-	if token == "" {
-		token = cfg.Settings["hetzner_token"].(string)
+	if token == "" && cfg.Settings != nil {
+		if t, ok := cfg.Settings["hetzner_token"].(string); ok {
+			token = t
+		}
 	}
 
 	if token == "" {
@@ -127,7 +130,24 @@ func (p *HetznerProvider) createServer(progressChan chan<- ui.StepProgressMsg, l
 	progressChan <- ui.StepProgressMsg{Progress: 0.2, Message: "Creating server"}
 
 	serverName := fmt.Sprintf("coolify-%d", time.Now().Unix())
-	sshKeyID := p.config.Settings["hetzner_ssh_key_id"].(int64)
+	rawKeyID, ok := p.config.Settings["hetzner_ssh_key_id"]
+	if !ok {
+		return fmt.Errorf("SSH key ID not found - setup SSH key step did not complete")
+	}
+	var sshKeyID int64
+	switch v := rawKeyID.(type) {
+	case int64:
+		sshKeyID = v
+	case int:
+		sshKeyID = int64(v)
+	case float64:
+		sshKeyID = int64(v)
+	default:
+		return fmt.Errorf("invalid SSH key ID type: %T", rawKeyID)
+	}
+	if sshKeyID <= 0 {
+		return fmt.Errorf("invalid SSH key ID value: %d", sshKeyID)
+	}
 
 	info, err := p.client.CreateServer(ServerCreateOpts{
 		Name:       serverName,
@@ -149,12 +169,19 @@ func (p *HetznerProvider) createServer(progressChan chan<- ui.StepProgressMsg, l
 }
 
 func (p *HetznerProvider) waitForServer(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
-	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Waiting for server to be ready"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Waiting for server SSH access"}
 
-	// Server is already running from CreateServer's built-in wait
-	// Just wait a bit for SSH to be available
-	time.Sleep(30 * time.Second)
+	ip, ok := p.config.Settings["hetzner_server_ip"].(string)
+	if !ok || ip == "" {
+		return fmt.Errorf("server IP not available")
+	}
 
+	sshClient := NewSSHClient(ip, "root")
+	if err := sshClient.WaitForSSH(3 * time.Minute); err != nil {
+		return fmt.Errorf("server became active but SSH is unavailable: %w", err)
+	}
+
+	progressChan <- ui.StepProgressMsg{Progress: 0.9, Message: "Server SSH is ready"}
 	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Server is ready"}
 	return nil
 }
@@ -170,14 +197,31 @@ func (p *HetznerProvider) configureFirewall(progressChan chan<- ui.StepProgressM
 }
 
 func (p *HetznerProvider) installDocker(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
-	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Docker being installed via cloud-init"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.3, Message: "Verifying Docker installation via cloud-init"}
 
-	// Docker installation is handled by cloud-init for faster deployment
-	// Wait additional time for cloud-init to complete
-	time.Sleep(60 * time.Second)
+	ip, ok := p.config.Settings["hetzner_server_ip"].(string)
+	if !ok || ip == "" {
+		return fmt.Errorf("server IP not available")
+	}
 
-	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Docker installed via cloud-init"}
-	return nil
+	sshClient := NewSSHClient(ip, "root")
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.3 + (float64(attempt) / 20.0 * 0.6)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Waiting for Docker (attempt %d/20)", attempt),
+		}
+		if _, err := sshClient.Execute("docker --version"); err == nil {
+			logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Docker installed via cloud-init"}
+			return nil
+		} else {
+			lastErr = err
+		}
+		time.Sleep(10 * time.Second)
+	}
+
+	return fmt.Errorf("Docker did not become available on server: %w", lastErr)
 }
 
 func (p *HetznerProvider) cloneRepository(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
@@ -189,22 +233,68 @@ func (p *HetznerProvider) cloneRepository(progressChan chan<- ui.StepProgressMsg
 }
 
 func (p *HetznerProvider) deployCoolify(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
-	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Starting Coolify"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Verifying Coolify startup"}
 
-	// Handled by cloud-init, wait for it to complete
-	time.Sleep(60 * time.Second)
+	ip, ok := p.config.Settings["hetzner_server_ip"].(string)
+	if !ok || ip == "" {
+		return fmt.Errorf("server IP not available")
+	}
 
-	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Coolify deployed"}
-	return nil
+	sshClient := NewSSHClient(ip, "root")
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.5 + (float64(attempt) / 20.0 * 0.4)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Waiting for Coolify containers (attempt %d/20)", attempt),
+		}
+		if _, err := sshClient.Execute("docker ps --format '{{.Names}}' | grep -q coolify"); err == nil {
+			logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: "Coolify deployed"}
+			return nil
+		} else {
+			lastErr = err
+		}
+		time.Sleep(10 * time.Second)
+	}
+
+	return fmt.Errorf("Coolify containers did not become ready: %w", lastErr)
 }
 
 func (p *HetznerProvider) runHealthChecks(progressChan chan<- ui.StepProgressMsg, logChan chan<- ui.LogMsg) error {
-	progressChan <- ui.StepProgressMsg{Progress: 0.5, Message: "Checking health"}
+	progressChan <- ui.StepProgressMsg{Progress: 0.2, Message: "Checking health"}
 
-	ip := p.config.Settings["hetzner_server_ip"].(string)
-	logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: fmt.Sprintf("Coolify available at: http://%s:8000", ip)}
+	ip, ok := p.config.Settings["hetzner_server_ip"].(string)
+	if !ok || ip == "" {
+		return fmt.Errorf("server IP not available for health check")
+	}
+	url := fmt.Sprintf("http://%s:8000", ip)
+	httpClient := &http.Client{Timeout: 10 * time.Second}
 
-	return nil
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		progress := 0.2 + (float64(attempt) / 20.0 * 0.7)
+		progressChan <- ui.StepProgressMsg{
+			Progress: progress,
+			Message:  fmt.Sprintf("Waiting for Coolify endpoint (attempt %d/20)", attempt),
+		}
+
+		resp, err := httpClient.Get(url)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+				logChan <- ui.LogMsg{Level: ui.LogSuccess, Message: fmt.Sprintf("Coolify available at: %s", url)}
+				return nil
+			}
+			lastErr = fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
+		} else {
+			lastErr = err
+		}
+
+		time.Sleep(15 * time.Second)
+	}
+
+	return fmt.Errorf("Coolify endpoint did not become reachable at %s: %w", url, lastErr)
+
 }
 
 // Helper methods
