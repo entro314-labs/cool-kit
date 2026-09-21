@@ -395,7 +395,7 @@ Configuration is saved to `~/.coolify/local-config.json`
 
 ### Local Development
 
-```
+```tree
 Docker Compose Stack:
 ├── coolify (app)
 ├── coolify-db (PostgreSQL 15)
@@ -405,7 +405,7 @@ Docker Compose Stack:
 
 ### Azure Deployment
 
-```
+```tree
 Azure Resources:
 ├── Resource Group
 ├── Virtual Network (10.0.0.0/16)
@@ -533,7 +533,7 @@ go fmt ./...
 
 ### Code Structure
 
-```
+```tree
 cool-kit/
 ├── cmd/                    # Command definitions
 │   ├── azure.go           # Azure commands
