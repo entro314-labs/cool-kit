@@ -7,7 +7,7 @@
 # =============================================================================
 # Build arguments
 # =============================================================================
-ARG GO_VERSION=1.26.5
+ARG GO_VERSION=1.27.4
 ARG DEBIAN_VERSION=trixie
 ARG BUILD_VERSION=dev
 ARG BUILD_DATE=unknown
