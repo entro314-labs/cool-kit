@@ -105,7 +105,7 @@ repos:
 
   # Markdown
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.48.0
+    rev: v0.50.1
     hooks:
       - id: markdownlint
         args: [--fix]
